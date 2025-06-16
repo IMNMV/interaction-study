@@ -1,180 +1,338 @@
-/* static/style.css */
-
+/* General Body and Layout */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f4f4f9;
+    color: #333;
     margin: 0;
     padding: 20px;
-    background-color: #f4f4f8;
-    color: #333;
     display: flex;
     justify-content: center;
-    align-items: flex-start; /* Changed from center to flex-start to allow for taller content without vertical centering */
+    align-items: flex-start;
     min-height: 100vh;
-}
-
-.container {
-    width: 100%;
-    max-width: 750px; /* Slightly increased max-width for a wider overall interface */
+ }
+ 
+ .container {
     background-color: #fff;
+    padding: 20px 40px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 25px; /* Slightly increased padding */
-    box-sizing: border-box;
-}
-
-.study-phase h2, .study-phase h3 {
-    color: #1a1a1a;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-top: 0;
-}
-
-label {
-    display: block;
-    margin-top: 15px;
-    margin-bottom: 5px;
-    font-weight: 500;
-}
-
-input[type="text"], input[type="number"], select, textarea {
-    width: calc(100% - 22px); /* Keeps padding in account */
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 700px;
+ }
+ 
+ h2, h3, h4 {
+    color: #111;
+ }
+ 
+ /* Form Styling */
+ #initial-form {
+    display: flex;
+    flex-direction: column;
+ }
+ 
+ #initial-form > label {
+    margin-top: 22px; 
+    font-weight: bold;
+    color: #444;
+ }
+ 
+ #initial-form > label:first-of-type {
+    margin-top: 10px;
+ }
+ 
+ input[type="text"],
+ input[type="number"],
+ select,
+ textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 6px;
+    border: 1px solid #ccc;
     border-radius: 4px;
-    box-sizing: border-box; /* Important for width calculation */
-}
-
-button {
+    box-sizing: border-box;
+ }
+ 
+ button {
     background-color: #007bff;
     color: white;
     padding: 10px 15px;
     border: none;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
+    margin-top: 25px;
     font-size: 16px;
     transition: background-color 0.2s;
-}
-
-button:hover {
+ }
+ 
+ button:hover {
     background-color: #0056b3;
-}
-
-button:disabled {
-    background-color: #ccc;
+ }
+ 
+ button:disabled {
+    background-color: #a0a0a0;
     cursor: not-allowed;
-}
-
-.chat-window {
-    /* --- MODIFICATION FOR BIGGER WINDOW --- */
-    height: 500px; /* Increased from 400px. Adjust as desired. */
-    /* You could also use max-height and let it grow, e.g., max-height: 60vh; */
-    /* --- END MODIFICATION --- */
-    border: 1px solid #ddd;
-    border-radius: 4px;
+ }
+ 
+ /* Checkbox Groups */
+ .checkbox-group {
+    margin-top: 8px;
     padding: 10px;
-    overflow-y: auto; /* This is crucial for scrolling within chat-window */
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+ }
+ .checkbox-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: normal;
+ }
+ 
+ /* Likert Bubble Styles */
+ .likert-bubble-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 10px;
     margin-bottom: 10px;
-    background-color: #f9f9f9;
+ }
+ 
+ .likert-bubble {
+    background-color: #f0f0f0;
+    border: 2px solid #ddd;
+    border-radius: 50px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    min-width: 60px;
+    text-align: center;
+    color: #333;
+ }
+ 
+ .likert-bubble:hover {
+    background-color: #e0e0e0;
+    border-color: #007bff;
+    transform: scale(1.05);
+ }
+ 
+ .likert-bubble.selected {
+    background-color: #007bff;
+    border-color: #0056b3;
+    color: white;
+ }
+ 
+ /* Bubble Selection Styles for Assessment */
+ .bubble-selection {
+    margin: 20px 0;
+ }
+ 
+ .bubble-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+ }
+ 
+ .confidence-bubble {
     display: flex;
     flex-direction: column;
-}
-
-#message-list {
-    flex-grow: 1; /* Allows message list to take available vertical space */
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 5px;
+    position: relative;
+ }
+ 
+ .confidence-bubble:hover {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+    transform: scale(1.05);
+ }
+ 
+ .confidence-bubble.selected {
+    border-color: #007bff;
+    background-color: #007bff;
+    color: white;
+ }
+ 
+ .confidence-bubble.selected .bubble-value,
+ .confidence-bubble.selected .bubble-label {
+    color: white;
+ }
+ 
+ .bubble-value {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 2px;
+ }
+ 
+ .bubble-label {
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.2;
+ }
+ 
+ /* Gradient coloring for bubbles */
+ .confidence-bubble[data-value="0"] { background-color: #d4f1d4; }
+ .confidence-bubble[data-value="0.1"] { background-color: #c8ecc8; }
+ .confidence-bubble[data-value="0.2"] { background-color: #bce7bc; }
+ .confidence-bubble[data-value="0.3"] { background-color: #b0e2b0; }
+ .confidence-bubble[data-value="0.4"] { background-color: #a4dda4; }
+ .confidence-bubble[data-value="0.5"] { background-color: #f0f0f0; }
+ .confidence-bubble[data-value="0.6"] { background-color: #ffd4d4; }
+ .confidence-bubble[data-value="0.7"] { background-color: #ffb8b8; }
+ .confidence-bubble[data-value="0.8"] { background-color: #ff9c9c; }
+ .confidence-bubble[data-value="0.9"] { background-color: #ff8080; }
+ .confidence-bubble[data-value="1"] { background-color: #ff6464; }
+ 
+ .confidence-bubble[data-value="0"]:hover { background-color: #c4e1c4; }
+ .confidence-bubble[data-value="0.1"]:hover { background-color: #b8dcb8; }
+ .confidence-bubble[data-value="0.2"]:hover { background-color: #acd7ac; }
+ .confidence-bubble[data-value="0.3"]:hover { background-color: #a0d2a0; }
+ .confidence-bubble[data-value="0.4"]:hover { background-color: #94cd94; }
+ .confidence-bubble[data-value="0.5"]:hover { background-color: #e0e0e0; }
+ .confidence-bubble[data-value="0.6"]:hover { background-color: #efc4c4; }
+ .confidence-bubble[data-value="0.7"]:hover { background-color: #efa8a8; }
+ .confidence-bubble[data-value="0.8"]:hover { background-color: #ef8c8c; }
+ .confidence-bubble[data-value="0.9"]:hover { background-color: #ef7070; }
+ .confidence-bubble[data-value="1"]:hover { background-color: #ef5454; }
+ 
+ /* Chat Interface */
+ .chat-window {
+    border: 1px solid #ccc;
+    background-color: #fafafa;
+    height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+    margin-bottom: 10px;
+ }
+ #message-list {
     display: flex;
     flex-direction: column;
-    overflow-y: auto; /* Ensures #message-list itself scrolls if its direct content overflows its allocated space */
-    /* This inner scrollbar on #message-list will appear if .chat-window has a fixed height
-       and #message-list grows beyond that fixed height due to flex-grow.
-       If .chat-window itself is the primary scroller due to its own fixed height,
-       this inner scrollbar might not always be necessary but is good practice.
-    */
-}
-
-.message-bubble {
-    max-width: 70%;
-    padding: 10px 15px;
+ }
+ .message-bubble {
+    padding: 8px 12px;
     border-radius: 18px;
     margin-bottom: 8px;
-    line-height: 1.4;
+    max-width: 80%;
     word-wrap: break-word;
-}
-
-.message-bubble.user {
+ }
+ .message-bubble.user {
     background-color: #007bff;
     color: white;
     align-self: flex-end;
-    border-bottom-right-radius: 4px; /* iMessage like tail */
-}
-
-.message-bubble.assistant {
+ }
+ .message-bubble.assistant {
     background-color: #e9e9eb;
-    color: #333;
+    color: #111;
     align-self: flex-start;
-    border-bottom-left-radius: 4px; /* iMessage like tail */
-}
-
-.chat-input-area {
+ }
+ .chat-input-area {
     display: flex;
-    gap: 10px;
-}
-
-.chat-input-area input[type="text"] {
+ }
+ .chat-input-area input {
     flex-grow: 1;
-    margin-bottom: 0;
+    margin-right: 10px;
+ }
+ 
+ /* Assessment Area & Slider Styling */
+#assessment-area {
+    text-align: center; /* Center contents by default */
 }
 
-#typing-indicator {
-    align-self: flex-start; /* Good for when it appears */
-    margin: 5px 0;
-    padding-left: 10px; /* Give it some padding like messages */
-    height: 30px; /* Give it a defined height to prevent layout shifts when it appears/disappears */
-    box-sizing: border-box;
-}
-#typing-indicator img{
-    opacity: 0.7;
-    height: 100%; /* Make image fill the reserved height */
-    width: auto;
-}
-
-#confidence-slider {
-    width: 100%; /* Good */
+#assessment-area h4,
+#assessment-area > label {
+    text-align: left; /* Keep heading and label left-aligned */
+    display: block; /* Ensure it takes full width */
     margin-bottom: 10px;
 }
 
-#assessment-area, #initial-setup {
-    margin-bottom: 20px;
+#confidence-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%; /* Make slider take full width of container */
+    height: 12px; /* Thicker track */
+    background: #e9ecef;
+    border-radius: 6px;
+    outline: none;
+    margin: 10px 0; /* Add some vertical spacing */
 }
 
-.loading-message {
-    margin-top: 10px;
-    font-style: italic;
-    color: #555;
+#confidence-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    margin-top: -6px; /* Center thumb vertically on the track */
 }
 
-.error-message {
-    color: red;
-    background-color: #ffebee;
-    border: 1px solid red;
-    padding: 10px;
-    border-radius: 4px;
-    margin-top: 15px;
+#confidence-slider::-moz-range-track {
+    width: 100%;
+    height: 12px;
+    background: #e9ecef;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
-#confidence-trend-chart pre {
-    background-color: #f0f0f0;
-    padding: 10px;
-    border-radius: 4px;
-    white-space: pre-wrap; /* Good */
+#confidence-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-#comment-section {
+#confidence-value {
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #333;
+    display: inline-block;
+    min-width: 40px; /* Give it some space so layout doesn't jump */
+}
+
+#submit-rating-button {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
     margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
+    padding: 12px 24px;
 }
-
-#comment-input-area {
-    margin-top: 10px;
-}
+ 
+ /* Misc UI Elements */
+ .loading-message {
+    margin-top: 15px;
+    color: #555;
+    font-style: italic;
+ }
+ .error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    margin-top: 20px;
+ }
+ 
+ /* Final Page styling */
+ #confidence-trend-data {
+    background-color: #f0f0f0;
+    padding: 15px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    font-family: "Courier New", Courier, monospace;
+    max-height: 200px;
+    overflow-y: auto;
+ }
