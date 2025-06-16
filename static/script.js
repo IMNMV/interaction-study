@@ -110,7 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const requiredLikerts = ['ai_detection_confidence_self', 'ai_detection_confidence_others', 'ai_capabilities_rating', 'trust_in_ai'];
         for (const field of requiredLikerts) {
-            if (!formData.get(field)) {
+            //if (!formData.get(field)) {
+            if (!formData.get(field) || formData.get(field) === '') {
                 showError(`Please select a value for all rating questions.`);
                 initLoadingDiv.style.display = 'none';
                 initialForm.querySelector('button').disabled = false;
@@ -389,7 +390,7 @@ if (sessionId) {
     // First, clear the invalid session from storage to prevent a refresh loop.
     localStorage.removeItem('sessionId');
     
-    // TODO: Replace the URL below with your Prolific error/completion URL when ready.
+    // TODO: Replace the URL below with Prolific error/completion URL when ready.
     // For now, redirecting to the home page to start over.
     window.location.href = '/'; 
 } else {
