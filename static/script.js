@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let decisionTimeSeconds = aiResponseTimestamp ? (new Date().getTime() / 1000) - aiResponseTimestamp : null;
 
         try {
-            const response = await fetch('${API_BASE_URL}/submit_rating', {
+            const response = await fetch(`${API_BASE_URL}/submit_rating`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, confidence, decision_time_seconds }),
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         feelsOffCheckbox.disabled = true;
 
         try {
-            await fetch('${API_BASE_URL}/submit_comment', {
+            await fetch(`${API_BASE_URL}/submit_comment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, comment: commentText }),
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finalCommentTextarea.disabled = true;
 
         try {
-            const response = await fetch('${API_BASE_URL}/submit_final_comment', {
+            const response = await fetch(`${API_BASE_URL}/submit_final_comment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, comment: commentText }),
