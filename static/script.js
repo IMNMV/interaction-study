@@ -2,6 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Phase and High-Level Elements ---
+    const API_BASE_URL = 'https://ai-turing-test-production.up.railway.app';
     const initialSetupDiv = document.getElementById('initial-setup');
     const chatInterfaceDiv = document.getElementById('chat-interface');
     const finalPageDiv = document.getElementById('final-page');
@@ -137,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const response = await fetch('/initialize_study', {
+            const response = await fetch(`${API_BASE_URL}/initialize_study`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -190,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Sending message to server:', { session_id: sessionId, message: messageText });
 
         try {
-            const response = await fetch('/send_message', {
+            const response = await fetch(`${API_BASE_URL}/send_message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, message: messageText }),
@@ -270,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let decisionTimeSeconds = aiResponseTimestamp ? (new Date().getTime() / 1000) - aiResponseTimestamp : null;
 
         try {
-            const response = await fetch('/submit_rating', {
+            const response = await fetch('${API_BASE_URL}/submit_rating', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, confidence, decision_time_seconds }),
@@ -320,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         feelsOffCheckbox.disabled = true;
 
         try {
-            await fetch('/submit_comment', {
+            await fetch('${API_BASE_URL}/submit_comment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, comment: commentText }),
@@ -359,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finalCommentTextarea.disabled = true;
 
         try {
-            const response = await fetch('/submit_final_comment', {
+            const response = await fetch('${API_BASE_URL}/submit_final_comment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, comment: commentText }),
