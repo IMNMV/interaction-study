@@ -92,12 +92,20 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (phase === 'final') finalPageDiv.style.display = 'block';
     }
 
+    function scrollToBottom() {
+        const chatWindow = document.querySelector('.chat-window');
+        // We use the setTimeout trick to make sure the browser has rendered the new content
+        setTimeout(() => {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }, 0);
+    }
+
     function addMessageToUI(text, sender) {
         const messageBubble = document.createElement('div');
         messageBubble.classList.add('message-bubble', sender);
         messageBubble.textContent = text;
         messageList.appendChild(messageBubble);
-        messageList.scrollTop = messageList.scrollHeight;
+        scrollToBottom();
         console.log(`Added message from ${sender}. messageList.childElementCount: ${messageList.childElementCount}`);
     }
 
@@ -185,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
                  typingIndicator.style.display = 'block';
                  console.log("Typing indicator shown after delay.");
+                 scrollToBottom();
             }
         }, indicatorDelay);
 
