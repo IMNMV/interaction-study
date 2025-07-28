@@ -191,10 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Setting timeout to show typing indicator in ${indicatorDelay / 1000} seconds.`);
         setTimeout(() => {
             if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
-                 typingIndicator.style.display = 'flex'; 
+                 typingIndicator.style.display = 'block';
                  console.log("Typing indicator shown after delay.");
                  scrollToBottom();
-        
             }
         }, indicatorDelay);
 
