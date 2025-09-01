@@ -454,6 +454,8 @@ By clicking "I agree" below, you indicate that:
     });
 
     // --- Prolific Dropout and Completion Logic ---
+    let handleEarlyExit = null; // Declare the variable first
+    
     if (isProduction) {
         // 1. DEFINE the function that will handle premature exits
         handleEarlyExit = (event) => {
@@ -558,16 +560,7 @@ Thank you again for your participation!
         tryProceedToChat();
     });
     // --- Event Listeners ---
-    // This variable will hold our exit handler. We declare it here so everything below can access it.
-    let handleEarlyExit = null; 
-
-    // This block DEFINES the exit handler logic if we are in production
-    if (isProduction) {
-        handleEarlyExit = (event) => {
-            // This redirects the user to Prolific if they refresh or close the tab mid-study.
-            window.location.href = PROLIFIC_TIMED_OUT_URL;
-        };
-    }
+    // handleEarlyExit already declared above, no need to redeclare
 
     initialForm.addEventListener('submit', (e) => {
         e.preventDefault();
