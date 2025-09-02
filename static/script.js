@@ -134,6 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastConfidenceValue = 0.5; // NEW: To store the last submitted rating
     let sliderStartValueThisTurn = 0.5; // NEW: To check if the slider has moved
     let finalSummaryData = null; // NEW: To store summary data before showing feedback form
+    
+    // Timer variables
+    let studyTimer = null;
+    let studyStartTime = null;
+    let timeExpired = false;
+    const STUDY_DURATION_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
 
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
@@ -238,6 +244,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
 
+    // Start the 20-minute countdown timer
+    function startStudyTimer() {
+        studyStartTime = Date.now();
+        const timerDisplay = document.getElementById('timer-display');
+        const countdownTimer = document.getElementById('countdown-timer');
+        
+        // Show the timer
+        timerDisplay.style.display = 'block';
+        
+        studyTimer = setInterval(() => {
+            const elapsed = Date.now() - studyStartTime;
+            const remaining = Math.max(0, STUDY_DURATION_MS - elapsed);
+            
+            // Format time as MM:SS
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            const timeText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            countdownTimer.textContent = timeText;
+            
+            // Change color when time is running out
+            if (remaining <= 60000) { // Last minute - red
+                timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
+            } else if (remaining <= 300000) { // Last 5 minutes - orange
+                timerDisplay.style.background = 'rgba(255, 193, 7, 0.9)';
+            }
+            
+            // Time expired
+            if (remaining === 0) {
+                clearInterval(studyTimer);
+                timeExpired = true;
+                timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
+                countdownTimer.textContent = '00:00';
+                
+                // Show time expired message if still in conversation
+                if (assessmentAreaDiv.style.display === 'block') {
+                    showError('Time expired! Your next rating must be a final decision (0 = Human or 1 = AI).');
+                }
+            }
+        }, 1000);
+    }
+
     // This function checks if both user and backend are ready, then proceeds
     function tryProceedToChat() {
         if (isBackendReady && isUserReady) {
@@ -257,6 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
             userMessageInput.disabled = false;
             sendMessageButton.disabled = false;
             userMessageInput.focus();
+            
+            // START THE 20-MINUTE TIMER
+            startStudyTimer();
         }
     }
 
@@ -732,8 +782,8 @@ Thank you again for your participation!
 
         let value = parseFloat(confidenceSlider.value);
         
-        // Enforce the 5-turn minimum before allowing a final decision
-        if (currentTurn < 5) {
+        // Enforce the 5-turn minimum before allowing a final decision (unless time expired)
+        if (currentTurn < 5 && !timeExpired) {
             if (value === 0.0) {
                 value = 0.01; // Clamp the lower bound
                 confidenceSlider.value = value;
@@ -741,6 +791,14 @@ Thank you again for your participation!
                 value = 0.99; // Clamp the upper bound
                 confidenceSlider.value = value;
             }
+        }
+        
+        // After time expires, force only final decisions (0.0 or 1.0)
+        if (timeExpired && value !== 0.0 && value !== 1.0) {
+            // Snap to nearest final decision
+            value = value < 0.5 ? 0.0 : 1.0;
+            confidenceSlider.value = value;
+            showError('Time expired! You must make a final decision: 0 = Human, 1 = AI');
         }
         
         confidenceValueSpan.textContent = value.toFixed(2);
@@ -939,6 +997,12 @@ Thank you again for your participation!
 
             if (response.ok) {
                 if (result.study_over) {
+                    // Clean up timer
+                    if (studyTimer) {
+                        clearInterval(studyTimer);
+                    }
+                    document.getElementById('timer-display').style.display = 'none';
+                    
                     // MODIFICATION START
                     finalSummaryData = result.session_data_summary; // Store data
                     showMainPhase('feedback'); // Go to feedback phase first
