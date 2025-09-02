@@ -985,14 +985,13 @@ Thank you again for your participation!
 
         if (commentText) {
             try {
-                // This now sends the comment and the backend handles the update
-                await fetch('/submit_comment', {
+                // Send final comment to the correct endpoint
+                await fetch('/submit_final_comment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         session_id: sessionId, 
-                        comment: commentText, 
-                        phase: 'pre_debrief' 
+                        comment: commentText
                     }),
                 });
             } catch (error) {
