@@ -163,6 +163,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END NEW SLIDER LOGIC ---
 
     // --- Helper Functions ---
+    // Normalize server timestamps that might be seconds or milliseconds.
+    function tsToMs(ts) {
+        if (ts == null) return null;
+        const n = Number(ts);
+        // If it's already in ms (>= ~2001-09), return as-is, else convert seconds -> ms
+        return n >= 1e12 ? n : n * 1000;
+    }
+
     function showError(message) {
         errorMessageArea.textContent = message;
         errorMessageArea.style.display = 'block';
@@ -779,24 +787,26 @@ Thank you again for your participation!
 
     // NEW: Track when user first interacts with confidence slider
     confidenceSlider.addEventListener('mousedown', () => {
-        if (!confidenceStartTime && aiResponseTimestamp) {
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (!confidenceStartTime && baseMs) {
             confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
                 timestamp: Date.now(),
-                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
+                timestampFromResponse: Date.now() - baseMs,
                 value: parseFloat(confidenceSlider.value)
             });
         }
     });
     
     confidenceSlider.addEventListener('touchstart', () => {
-        if (!confidenceStartTime && aiResponseTimestamp) {
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (!confidenceStartTime && baseMs) {
             confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
                 timestamp: Date.now(),
-                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
+                timestampFromResponse: Date.now() - baseMs,
                 value: parseFloat(confidenceSlider.value)
             });
         }
@@ -813,11 +823,12 @@ Thank you again for your participation!
         let value = parseFloat(confidenceSlider.value);
         
         // NEW: Track all slider movements for enhanced timing analysis
-        if (confidenceStartTime && aiResponseTimestamp) {
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (confidenceStartTime && baseMs) {
             sliderInteractionLog.push({
                 event: 'slider_move',
                 timestamp: Date.now(),
-                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
+                timestampFromResponse: Date.now() - baseMs,
                 timestampFromFirstTouch: Date.now() - confidenceStartTime,
                 value: value
             });
@@ -1027,20 +1038,16 @@ Thank you again for your participation!
         let decisionTimeSeconds = null;
         let readingTimeSeconds = null;
         let activeDecisionTimeSeconds = null;
-        
-        if (aiResponseTimestamp) {
-            // Total time (existing calculation)
-            decisionTimeSeconds = (Date.now() / 1000) - aiResponseTimestamp;
-            
-            // Enhanced timing breakdown
+
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (baseMs) {
+            decisionTimeSeconds = (Date.now() - baseMs) / 1000;
             if (confidenceStartTime) {
-                // Reading time: from AI response to first slider touch
-                readingTimeSeconds = (confidenceStartTime - (aiResponseTimestamp * 1000)) / 1000;
-                // Active decision time: from first slider touch to submit
+                readingTimeSeconds = (confidenceStartTime - baseMs) / 1000;
                 activeDecisionTimeSeconds = (Date.now() - confidenceStartTime) / 1000;
             }
         } else {
-            console.warn("aiResponseTimestamp was not set, decision time will be null.");
+            console.warn("aiResponseTimestamp missing; timing metrics will be null.");
         }
 
         console.log('Submitting rating. Confidence:', confidence, 'Total Time:', decisionTimeSeconds, 'Reading Time:', readingTimeSeconds, 'Active Time:', activeDecisionTimeSeconds);
