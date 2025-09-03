@@ -780,11 +780,11 @@ Thank you again for your participation!
     // NEW: Track when user first interacts with confidence slider
     confidenceSlider.addEventListener('mousedown', () => {
         if (!confidenceStartTime && aiResponseTimestamp) {
-            confidenceStartTime = performance.now();
+            confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
-                timestamp: performance.now(),
-                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
                 value: parseFloat(confidenceSlider.value)
             });
         }
@@ -792,11 +792,11 @@ Thank you again for your participation!
     
     confidenceSlider.addEventListener('touchstart', () => {
         if (!confidenceStartTime && aiResponseTimestamp) {
-            confidenceStartTime = performance.now();
+            confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
-                timestamp: performance.now(),
-                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
                 value: parseFloat(confidenceSlider.value)
             });
         }
@@ -816,9 +816,9 @@ Thank you again for your participation!
         if (confidenceStartTime && aiResponseTimestamp) {
             sliderInteractionLog.push({
                 event: 'slider_move',
-                timestamp: performance.now(),
-                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
-                timestampFromFirstTouch: performance.now() - confidenceStartTime,
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - (aiResponseTimestamp * 1000),
+                timestampFromFirstTouch: Date.now() - confidenceStartTime,
                 value: value
             });
         }
@@ -1030,14 +1030,14 @@ Thank you again for your participation!
         
         if (aiResponseTimestamp) {
             // Total time (existing calculation)
-            decisionTimeSeconds = (new Date().getTime() / 1000) - aiResponseTimestamp;
+            decisionTimeSeconds = (Date.now() / 1000) - aiResponseTimestamp;
             
             // Enhanced timing breakdown
             if (confidenceStartTime) {
                 // Reading time: from AI response to first slider touch
                 readingTimeSeconds = (confidenceStartTime - (aiResponseTimestamp * 1000)) / 1000;
                 // Active decision time: from first slider touch to submit
-                activeDecisionTimeSeconds = (performance.now() - confidenceStartTime) / 1000;
+                activeDecisionTimeSeconds = (Date.now() - confidenceStartTime) / 1000;
             }
         } else {
             console.warn("aiResponseTimestamp was not set, decision time will be null.");
