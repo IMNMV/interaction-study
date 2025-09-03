@@ -135,6 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let sliderStartValueThisTurn = 0.5; // NEW: To check if the slider has moved
     let finalSummaryData = null; // NEW: To store summary data before showing feedback form
     
+    // NEW: Enhanced reaction time tracking variables
+    let confidenceStartTime = null; // When they first touch the slider
+    let sliderInteractionLog = []; // Log of all slider interactions
+    
     // Timer variables
     let studyTimer = null;
     let studyStartTime = null;
@@ -774,6 +778,31 @@ Thank you again for your participation!
         }
     });
 
+    // NEW: Track when user first interacts with confidence slider
+    confidenceSlider.addEventListener('mousedown', () => {
+        if (!confidenceStartTime && aiResponseTimestamp) {
+            confidenceStartTime = performance.now();
+            sliderInteractionLog.push({
+                event: 'slider_first_touch',
+                timestamp: performance.now(),
+                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
+                value: parseFloat(confidenceSlider.value)
+            });
+        }
+    });
+    
+    confidenceSlider.addEventListener('touchstart', () => {
+        if (!confidenceStartTime && aiResponseTimestamp) {
+            confidenceStartTime = performance.now();
+            sliderInteractionLog.push({
+                event: 'slider_first_touch',
+                timestamp: performance.now(),
+                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
+                value: parseFloat(confidenceSlider.value)
+            });
+        }
+    });
+
     // MODIFIED event listener for confidence slider to handle activation and enabling submit
     confidenceSlider.addEventListener('input', () => {
         // On first interaction, remove the pristine class to show the thumb and value
@@ -783,6 +812,17 @@ Thank you again for your participation!
         }
 
         let value = parseFloat(confidenceSlider.value);
+        
+        // NEW: Track all slider movements for enhanced timing analysis
+        if (confidenceStartTime && aiResponseTimestamp) {
+            sliderInteractionLog.push({
+                event: 'slider_move',
+                timestamp: performance.now(),
+                timestampFromResponse: performance.now() - (aiResponseTimestamp * 1000),
+                timestampFromFirstTouch: performance.now() - confidenceStartTime,
+                value: value
+            });
+        }
         
         // NEW: No more 5-turn minimum - allow 0.0/1.0 selection anytime
         // (Removed the 5-turn restriction as requested)
@@ -912,6 +952,10 @@ Thank you again for your participation!
                 chatInputContainer.style.display = 'none'; 
                 assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
                 
+                // NEW: Reset timing variables for this turn
+                confidenceStartTime = null;
+                sliderInteractionLog = [];
+                
                 confidenceSlider.value = lastConfidenceValue; // Set to last submitted value
                 sliderStartValueThisTurn = lastConfidenceValue; // Store it for the "must-move" check
 
@@ -980,20 +1024,40 @@ Thank you again for your participation!
         const confidence = parseFloat(confidenceSlider.value);
         lastConfidenceValue = confidence; // NEW: Save the submitted value for the next round
 
+        // NEW: Calculate enhanced timing data
         let decisionTimeSeconds = null;
+        let readingTimeSeconds = null;
+        let activeDecisionTimeSeconds = null;
+        
         if (aiResponseTimestamp) {
+            // Total time (existing calculation)
             decisionTimeSeconds = (new Date().getTime() / 1000) - aiResponseTimestamp;
+            
+            // Enhanced timing breakdown
+            if (confidenceStartTime) {
+                // Reading time: from AI response to first slider touch
+                readingTimeSeconds = (confidenceStartTime - (aiResponseTimestamp * 1000)) / 1000;
+                // Active decision time: from first slider touch to submit
+                activeDecisionTimeSeconds = (performance.now() - confidenceStartTime) / 1000;
+            }
         } else {
             console.warn("aiResponseTimestamp was not set, decision time will be null.");
         }
 
-        console.log('Submitting rating. Confidence:', confidence, 'Decision Time:', decisionTimeSeconds);
+        console.log('Submitting rating. Confidence:', confidence, 'Total Time:', decisionTimeSeconds, 'Reading Time:', readingTimeSeconds, 'Active Time:', activeDecisionTimeSeconds);
 
         try {
             const response = await fetch('/submit_rating', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, confidence: confidence, decision_time_seconds: decisionTimeSeconds }),
+                body: JSON.stringify({ 
+                    session_id: sessionId, 
+                    confidence: confidence, 
+                    decision_time_seconds: decisionTimeSeconds,
+                    reading_time_seconds: readingTimeSeconds,
+                    active_decision_time_seconds: activeDecisionTimeSeconds,
+                    slider_interaction_log: sliderInteractionLog
+                }),
             });
             const result = await response.json();
             console.log('Rating submission response from server:', result);
@@ -1164,6 +1228,9 @@ Thank you again for your participation!
         currentTurn = 0;
         aiResponseTimestamp = null;
         lastConfidenceValue = 0.5; // Reset for new session
+        // NEW: Reset timing variables
+        confidenceStartTime = null;
+        sliderInteractionLog = [];
         messageList.innerHTML = '';
         initialForm.reset();
         
@@ -1212,6 +1279,9 @@ Thank you again for your participation!
     // --- Initial Page Load ---
     localStorage.removeItem('sessionId');
     aiResponseTimestamp = null;
+    // NEW: Reset timing variables
+    confidenceStartTime = null;
+    sliderInteractionLog = [];
     showMainPhase('consent'); // Start with the consent form instead of 'initial'
     // Log page load event with basic metadata
     logUiEvent('page_load', {
