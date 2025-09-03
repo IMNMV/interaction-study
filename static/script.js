@@ -275,7 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(studyTimer);
                 timeExpired = true;
                 timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
-                countdownTimer.textContent = '00:00';
+                timerDisplay.innerHTML = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
+                timerDisplay.style.fontSize = '14px';
+                timerDisplay.style.width = '300px';
                 
                 // Show time expired message if still in conversation
                 if (assessmentAreaDiv.style.display === 'block') {
@@ -782,16 +784,8 @@ Thank you again for your participation!
 
         let value = parseFloat(confidenceSlider.value);
         
-        // Enforce the 5-turn minimum before allowing a final decision (unless time expired)
-        if (currentTurn < 5 && !timeExpired) {
-            if (value === 0.0) {
-                value = 0.01; // Clamp the lower bound
-                confidenceSlider.value = value;
-            } else if (value === 1.0) {
-                value = 0.99; // Clamp the upper bound
-                confidenceSlider.value = value;
-            }
-        }
+        // NEW: No more 5-turn minimum - allow 0.0/1.0 selection anytime
+        // (Removed the 5-turn restriction as requested)
         
         // After time expires, force only final decisions (0.0 or 1.0)
         if (timeExpired && value !== 0.0 && value !== 1.0) {
@@ -964,6 +958,15 @@ Thank you again for your participation!
 
     submitRatingButton.addEventListener('click', async () => {
         if (!sessionId) return;
+
+        // NEW: Block non-final submissions after time expires
+        if (timeExpired) {
+            const confidence = parseFloat(confidenceSlider.value);
+            if (confidence !== 0.0 && confidence !== 1.0) {
+                showError('Time expired! You must select exactly 0 (Human) or 1 (AI) to continue.');
+                return; // Block the submission
+            }
+        }
 
         if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() === '') {
             showError("Please provide a comment if 'Include a comment' is checked, or uncheck the box to proceed with rating only.");
