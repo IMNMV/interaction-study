@@ -101,7 +101,7 @@
         <div id="instructions-phase" class="study-phase" style="display: none;">
             <h2>Welcome to the Interaction Study</h2>
             <p>
-                In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human.</strong> Please assume AI means Large Language Model (LLM), such as ChatGPT.
+                In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human. If your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible.</strong> Please assume AI means Large Language Model (LLM), such as ChatGPT.
             <p>
                 On the next page you will complete a brief form and then randomly assigned to either send the first message or receive the first message. 
                 After that you will be shown a conversation box where you can chat back and forth with your partner. 
@@ -111,7 +111,7 @@
             </p>
             <p>
                 During the conversation, after each message exchange, a slider will appear below the chat box where you can indicate how confident you are that you're talking to an AI or a human. 
-                <strong><em>Evaluate each message sent by your conversation partner as evidence towards your judgment for that turn.</em></strong>
+                <strong><em>Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human. Then, evaluate each message sent by your conversation partner as evidence towards your judgment for that turn.</em></strong>
             <p>
                 You can adjust this slider as many times as you want after each message before you submit your rating, but once you submit your rating you will not be able to change it again for that turn.
             <p>
@@ -358,12 +358,13 @@
     <div id="final-instructions-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <p>In a moment you will see a conversation box. Your job is to decide if your conversational partner is a human, or an AI.</p>
-            <p><em>Remember, you should consider each message sent by your conversation partner as evidence towards your judgment for that turn. Your conversation partner knows they're being evaluated and is trying to appear as human-like as possible. You are free to chat as you would like.</em></p>
+            <p><em>Remember, if your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible. Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human. 
+                you should consider each message sent by your conversation partner as evidence towards your judgment for that turn. You are free to chat as you would like.</em></p>
 
             <p class="emphasis-line"><strong>You have been randomly selected to send the first message.</strong></p>
             <p>After you send a message, your partner will respond and then a slider will appear. Sliding it to the left means you're more sure your partner is a human, sliding it to the right means more sure they're an AI. A value of .5 means unsure.</p>
-            <p>Sliding it all the way to either side after the 5th round means you're 100% sure your partner is either human (left) or AI (right). However, you are allowed to take longer than 5 rounds to make a final choice if you're not sure by then.</p>
-            <p>At the 20 minute mark your choice will be used as the final answer if you have not made a definitive decision by then.</p>
+            <p><strong>Only select a value of 0 (human) or 1 (AI) if you are ABSOLUTELY SURE your partner is a human or AI.</p><strong>
+            <p>You will chat with your partner for the full 20 minutes, even if you select 0 or 1 before the 20 minutes is up. At the 20 minute mark you will make a final determination where you will be forced to choose either 0 or 1.</p>
             <button id="final-instructions-button">I understand</button>
         </div>
     </div>
