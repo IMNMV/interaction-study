@@ -859,54 +859,9 @@ Thank you again for your participation!
         // Tag this animation run so stale timeouts can't re-show the indicator later
         const runId = String(Date.now());
         typingIndicator.dataset.runId = runId;
-
-        const startedAt = performance.now();
-        const MIN_P = 0.15;      // 15% at start
-        const MAX_P = 0.9;       // caps at 90%
-        const SAT_MS = 15000;    // ~15s to reach MAX_P
-        const MIN_PAUSE_MS = 1000;  // >= 1s as requested
-        const MAX_PAUSE_MS = 2000;  // up to 2s (tweak if you like)
-
-        const stillCurrent = () => typingIndicator.dataset.runId === runId;
-
-        function scheduleNextCheck() {
-            if (!stillCurrent()) return;
-            const elapsed = performance.now() - startedAt;
-            // Check frequency eases a bit as time goes on (you can keep it constant if you prefer)
-            const nextCheckMs = Math.max(800, Math.min(2500, 1200 + elapsed / 12));
-            setTimeout(maybePause, nextCheckMs);
-        }
-
-        function maybePause() {
-            if (!stillCurrent()) return;
-
-            const elapsed = performance.now() - startedAt;
-            // Probability grows with elapsed time, saturating at MAX_P
-            const growth = Math.min(1, elapsed / SAT_MS);
-            let p = MIN_P + (MAX_P - MIN_P) * growth;
-
-            // (Optional) tiny nudge from messageLength if you want:
-            // p = Math.min(0.98, p + Math.min(0.15, (messageLength || 0) / 400));
-
-            if (Math.random() < p) {
-                // Perform a pause of at least 1s
-                typingIndicator.style.display = 'none';
-                const pauseMs = MIN_PAUSE_MS + Math.floor(Math.random() * (MAX_PAUSE_MS - MIN_PAUSE_MS + 1));
-                setTimeout(() => {
-                    if (!stillCurrent()) return;
-                    typingIndicator.style.display = 'flex';
-                    scrollToBottom();
-                    scheduleNextCheck();
-                }, pauseMs);
-            } else {
-                scheduleNextCheck();
-            }
-        }
-
-        // First pause opportunity ~1.5s after starting (keeps original feel)
-        setTimeout(maybePause, 1500);
-
-        return null; // matches existing callsite
+        
+        // That's it - just show it and leave it on until the message arrives
+        return null;
     }
             
 
