@@ -842,7 +842,6 @@ Thank you again for your participation!
             // Snap to nearest final decision
             value = value < 0.5 ? 0.0 : 1.0;
             confidenceSlider.value = value;
-            showError('Time expired! You must make a final decision: 0 = Human, 1 = AI');
         }
         
         confidenceValueSpan.textContent = value.toFixed(2);
@@ -921,20 +920,30 @@ Thank you again for your participation!
                 confidenceStartTime = null;
                 sliderInteractionLog = [];
                 
-                confidenceSlider.value = lastConfidenceValue; // Set to last submitted value
-                sliderStartValueThisTurn = lastConfidenceValue; // Store it for the "must-move" check
-
-                if (currentTurn === 1) {
-                    // First turn: hide thumb and value
-                    confidenceSlider.classList.add('pristine');
-                    confidenceValueSpan.style.display = 'none';
-                    submitRatingButton.disabled = true; // Must interact to enable
-                } else {
-                    // Subsequent turns: show thumb and value, but disable submit until moved
+                if (timeExpired) {
+                    // Final turn: Force slider to 0.5 and require 0 or 1 selection
+                    confidenceSlider.value = 0.5;
+                    sliderStartValueThisTurn = 0.5;
                     confidenceSlider.classList.remove('pristine');
                     confidenceValueSpan.style.display = 'inline';
-                    confidenceValueSpan.textContent = lastConfidenceValue.toFixed(2);
-                    submitRatingButton.disabled = false; // Must move to enable
+                    confidenceValueSpan.textContent = '0.50';
+                    submitRatingButton.disabled = true; // Must move to 0 or 1 to enable
+                } else {
+                    confidenceSlider.value = lastConfidenceValue; // Set to last submitted value
+                    sliderStartValueThisTurn = lastConfidenceValue; // Store it for the "must-move" check
+
+                    if (currentTurn === 1) {
+                        // First turn: hide thumb and value
+                        confidenceSlider.classList.add('pristine');
+                        confidenceValueSpan.style.display = 'none';
+                        submitRatingButton.disabled = true; // Must interact to enable
+                    } else {
+                        // Subsequent turns: show thumb and value, but disable submit until moved
+                        confidenceSlider.classList.remove('pristine');
+                        confidenceValueSpan.style.display = 'inline';
+                        confidenceValueSpan.textContent = lastConfidenceValue.toFixed(2);
+                        submitRatingButton.disabled = false; // Must move to enable
+                    }
                 }
 
                 confidenceSlider.disabled = false;
