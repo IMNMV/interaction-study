@@ -998,6 +998,18 @@ Thank you again for your participation!
         const confidence = parseFloat(confidenceSlider.value);
         lastConfidenceValue = confidence; // NEW: Save the submitted value for the next round
 
+        // NEW: Log the final submitted value to ensure data integrity
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (baseMs) {
+            sliderInteractionLog.push({
+                event: 'slider_submit',
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - baseMs,
+                timestampFromFirstTouch: confidenceStartTime ? Date.now() - confidenceStartTime : null,
+                value: confidence
+            });
+        }
+
         // NEW: Calculate enhanced timing data
         let decisionTimeSeconds = null;
         let readingTimeSeconds = null;
