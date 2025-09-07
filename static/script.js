@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(studyTimer);
                 timeExpired = true;
                 timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
-                timerDisplay.innerHTML = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
+                timerDisplay.innerHTML = 'Time limit reached! Make your final selection at the next rating: 0 (Human) or 1 (AI)';
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
                 
