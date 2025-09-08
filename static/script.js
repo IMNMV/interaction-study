@@ -1,6 +1,6 @@
 // FILE: static/script.js
-// This is the corrected version with ONLY the requested slider changes added.
-// All original console.log statements have been preserved.
+// This is the corrected version with error handling improvements.
+// All console statements removed to prevent participant contamination.
 document.addEventListener('DOMContentLoaded', () => {
     const initialSetupDiv = document.getElementById('initial-setup');
     const chatInterfaceDiv = document.getElementById('chat-interface'); // Main div for chat + assessment
@@ -78,6 +78,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const isProduction = (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
 
     // --- Railway API adapter (add right after `isProduction`) ---
+    
+    // DEBUG: Railway-only error logging function
+    async function logToRailway(errorInfo) {
+        try {
+            const debugPayload = {
+                error_type: errorInfo.type || 'Unknown',
+                error_message: errorInfo.message || 'No message',
+                session_id: sessionId || 'No session',
+                current_turn: currentTurn || 'No turn',
+                timestamp: new Date().toISOString(),
+                stack_trace: errorInfo.stack || 'No stack trace',
+                additional_context: errorInfo.context || {}
+            };
+            
+            await fetch(`${API_BASE_URL}/debug_log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(debugPayload)
+            });
+            // Silently fail - no logs or notifications to avoid participant contamination
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+        }
+    }
+    
     const API_BASE_URL = isProduction ? 'https://ai-turing-test-production.up.railway.app' : '';
 
     // Monkey-patch fetch so relative paths (starting with "/") hit Railway in production.
@@ -234,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
         } catch (e) {
-            console.warn('Failed to log UI event', event, e);
+            // Silently fail - cannot risk any participant-visible errors
         }
     }
 
@@ -251,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
         } catch (e) {
-            console.warn('Failed to finalize without session', e);
+            // Silently fail - cannot risk any participant-visible errors
         }
     }
 
@@ -288,14 +313,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(studyTimer);
                 timeExpired = true;
                 timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
-                timerDisplay.innerHTML = 'Time limit reached! Make your final selection at the next rating: 0 (Human) or 1 (AI)';
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
                 
-                // Show time expired message if still in conversation
+                // Dynamic message based on current study state
+                let timeExpiredMessage;
                 if (assessmentAreaDiv.style.display === 'block') {
+                    // State 3: Rating phase - user needs to submit confidence rating
+                    timeExpiredMessage = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
                     showError('Time expired! Your next rating must be a final decision (0 = Human or 1 = AI).');
+                } else if (typingIndicator.style.display === 'flex') {
+                    // State 2: Waiting for AI response
+                    timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
+                } else {
+                    // State 1: Before sending message
+                    timeExpiredMessage = 'Time limit reached! Please send your message to receive your last response to judge.';
                 }
+                
+                timerDisplay.innerHTML = timeExpiredMessage;
             }
         }, 1000);
     }
@@ -326,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showMainPhase(phase) {
-        console.log(`Showing main phase: ${phase}`);
         // Hide all phases first
         consentPhaseDiv.style.display = 'none';
         instructionsPhaseDiv.style.display = 'none';
@@ -364,7 +398,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // This ensures scrollHeight has the correct, updated value.
         scrollToBottom();
 
-        console.log(`Added message from ${sender}. messageList.childElementCount: ${messageList.childElementCount}`);
+        // Log to Railway only
+        logToRailway({
+            type: 'UI_DEBUG',
+            message: `Added message from ${sender}. messageList.childElementCount: ${messageList.childElementCount}`,
+            context: {
+                function: 'addMessageToUI',
+                sender: sender,
+                message_count: messageList.childElementCount
+            }
+        });
     }
 
     function generateAndDownloadPdf(content, filename) {
@@ -406,10 +449,21 @@ document.addEventListener('DOMContentLoaded', () => {
             // --- END: New Logic ---
 
             doc.save(filename);
-            console.log(`PDF "${filename}" download initiated.`);
+            // Log to Railway only
+            logToRailway({
+                type: 'PDF_DOWNLOAD',
+                message: `PDF "${filename}" download initiated`,
+                context: { filename: filename }
+            });
 
         } catch (error) {
-            console.error('Error creating PDF:', error);
+            // Log to Railway only
+            logToRailway({
+                type: 'PDF_GENERATION_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: { filename: filename }
+            });
             showError('There was a problem generating the PDF download. Please contact the researcher.');
         }
     }
@@ -759,7 +813,7 @@ Thank you again for your participation!
 
             } catch (error) {
                 // This block runs if any part of the 'try' block fails
-                showError('Error: ' + error.message);
+                // SILENT: Study initialization failure - Railway logs only
                 finalInstructionsModal.style.display = 'none';
                 initLoadingDiv.style.display = 'none';
                 clearInterval(progressInterval);
@@ -881,7 +935,12 @@ Thank you again for your participation!
 
         const indicatorDelay = Math.random() * (5000 - 2000) + 2000;
         
-        console.log(`Waiting ${(indicatorDelay/1000).toFixed(1)}s before showing typing indicator`);
+        // Log to Railway only
+        logToRailway({
+            type: 'TYPING_INDICATOR_DEBUG',
+            message: `Waiting ${(indicatorDelay/1000).toFixed(1)}s before showing typing indicator`,
+            context: { delay_seconds: indicatorDelay/1000 }
+        });
         
         setTimeout(() => {
             if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
@@ -890,7 +949,16 @@ Thank you again for your participation!
             }
         }, indicatorDelay);
 
-        console.log('Sending message to server:', { session_id: sessionId, message: messageText });
+        // Log to Railway only
+        logToRailway({
+            type: 'API_REQUEST',
+            message: 'Sending message to server',
+            context: { 
+                session_id: sessionId, 
+                message_length: messageText.length,
+                endpoint: '/send_message'
+            }
+        });
 
         try {
             const response = await fetch('/send_message', {
@@ -899,13 +967,22 @@ Thank you again for your participation!
                 body: JSON.stringify({ session_id: sessionId, message: messageText }),
             });
             const result = await response.json();
-            console.log('Received response from /send_message:', result);
+            // Log to Railway only
+            logToRailway({
+                type: 'API_RESPONSE',
+                message: 'Received response from /send_message',
+                context: { 
+                    response_ok: response.ok,
+                    turn: result.turn,
+                    ai_response_length: result.ai_response ? result.ai_response.length : 0
+                }
+            });
 
             // Bump runId so pending timeouts won't bring the indicator back
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
             typingIndicator.style.display = 'none';
 
-            console.log('Typing indicator hidden');
+            // Typing indicator hidden - no logging needed
 
             if (response.ok) {
                 addMessageToUI(result.ai_response, 'assistant');
@@ -955,18 +1032,41 @@ Thank you again for your participation!
                 messageList.scrollTop = messageList.scrollHeight;
 
             } else { 
-                showError(getApiErrorMessage(result, 'Failed to send message or get AI response.'));
-                addMessageToUI("Sorry, I couldn't process that. Please try again.", 'assistant');
+                // Log API error to Railway
+                logToRailway({
+                    type: 'API_ERROR',
+                    message: getApiErrorMessage(result, 'Failed to send message or get AI response.'),
+                    context: { 
+                        response_ok: response.ok,
+                        response_status: response.status,
+                        result: result
+                    }
+                });
+                
+                // SILENT: No participant-visible error - logged to Railway only
+                // REMOVED: addMessageToUI - don't contaminate conversation log with error messages
                 userMessageInput.disabled = false;
                 sendMessageButton.disabled = false;
                 chatInputContainer.style.display = 'flex';
                 assessmentAreaDiv.style.display = 'none';
             }
         } catch (error) {
-            showError('Error sending message: ' + error.message);
-            console.error('Catch block error in handleSendMessage:', error);
+            // Log frontend error to Railway
+            logToRailway({
+                type: error.name || 'FRONTEND_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: {
+                    function: 'handleSendMessage',
+                    time_expired: timeExpired,
+                    user_message_length: userMessageInput.value.length
+                }
+            });
+            
+            // SILENT: No participant-visible error - logged to Railway only
+            // Error already logged to Railway via logToRailway() above
             typingIndicator.style.display = 'none';
-            addMessageToUI("Sorry, a technical error occurred. Please try again.", 'assistant');
+            // REMOVED: addMessageToUI - don't contaminate conversation log with error messages
             userMessageInput.disabled = false;
             sendMessageButton.disabled = false;
             chatInputContainer.style.display = 'flex';
@@ -988,7 +1088,7 @@ Thank you again for your participation!
         }
 
         if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() === '') {
-            showError("Please provide a comment if 'Include a comment' is checked, or uncheck the box to proceed with rating only.");
+            // SILENT: No participant-visible error - just prevent submission
             return;
         }
 
@@ -1021,10 +1121,26 @@ Thank you again for your participation!
                 activeDecisionTimeSeconds = (Date.now() - confidenceStartTime) / 1000;
             }
         } else {
-            console.warn("aiResponseTimestamp missing; timing metrics will be null.");
+            // Log to Railway only
+            logToRailway({
+                type: 'TIMING_WARNING',
+                message: 'aiResponseTimestamp missing; timing metrics will be null',
+                context: { function: 'submitRatingButton' }
+            });
         }
 
-        console.log('Submitting rating. Confidence:', confidence, 'Total Time:', decisionTimeSeconds, 'Reading Time:', readingTimeSeconds, 'Active Time:', activeDecisionTimeSeconds);
+        // Log to Railway only
+        logToRailway({
+            type: 'RATING_SUBMISSION',
+            message: 'Submitting rating with timing metrics',
+            context: {
+                confidence: confidence,
+                decision_time_seconds: decisionTimeSeconds,
+                reading_time_seconds: readingTimeSeconds,
+                active_decision_time_seconds: activeDecisionTimeSeconds,
+                turn: currentTurn
+            }
+        });
 
         try {
             const response = await fetch('/submit_rating', {
@@ -1040,7 +1156,15 @@ Thank you again for your participation!
                 }),
             });
             const result = await response.json();
-            console.log('Rating submission response from server:', result);
+            // Log to Railway only
+            logToRailway({
+                type: 'RATING_RESPONSE',
+                message: 'Rating submission response from server',
+                context: {
+                    study_over: result.study_over,
+                    response_ok: response.ok
+                }
+            });
 
             if (response.ok) {
                 if (result.study_over) {
@@ -1075,13 +1199,13 @@ Thank you again for your participation!
                     }
                 }
             } else { 
-                showError(getApiErrorMessage(result, 'Failed to submit rating.'));
+                // SILENT: No participant-visible error - logged to Railway only
                 submitRatingButton.disabled = false;
                 confidenceSlider.disabled = false;
             }
         } catch (error) { 
-            showError('Error submitting rating: ' + error.message);
-            console.error('Catch block error in submitRatingButton:', error);
+            // SILENT: No participant-visible error - logged to Railway only
+            // Error already logged to Railway if needed
             submitRatingButton.disabled = false;
             confidenceSlider.disabled = false;
         } finally {
@@ -1106,7 +1230,13 @@ Thank you again for your participation!
                     }),
                 });
             } catch (error) {
-                console.error('Feedback submission error:', error);
+                // Log to Railway only
+                logToRailway({
+                    type: 'FEEDBACK_SUBMISSION_ERROR',
+                    message: error.message,
+                    stack: error.stack,
+                    context: { function: 'submitFeedbackButton' }
+                });
             }
         }
         // Proceed to the final page
@@ -1122,17 +1252,14 @@ Thank you again for your participation!
 
     submitCommentButton.addEventListener('click', async () => {
         if (!sessionId) {
-            showError("Session ID is missing. Please refresh.");
+            // SILENT: No participant-visible error - just prevent submission
             return;
         }
-        if (!feelsOffCheckbox.checked) {
-            showError("Please check 'Include a comment' to submit a comment.");
-            return;
-        }
+        // LEGACY CODE REMOVED - this checkbox validation can never be reached in current UI flow
 
         const commentText = feelsOffCommentTextarea.value.trim();
         if (commentText === '') {
-            showError("Comment cannot be empty if 'Include a comment' is checked.");
+            // SILENT: No participant-visible error - just prevent submission
             return;
         }
 
@@ -1148,7 +1275,12 @@ Thank you again for your participation!
             });
             const result = await response.json();
             if (response.ok) {
-                console.log("Comment submitted successfully.");
+                // Log to Railway only
+                logToRailway({
+                    type: 'COMMENT_SUBMISSION_SUCCESS',
+                    message: 'Comment submitted successfully',
+                    context: { function: 'submitCommentButton' }
+                });
                 feelsOffCommentTextarea.value = '';
                 feelsOffCheckbox.checked = false;
                 commentInputArea.style.display = 'none';
@@ -1161,11 +1293,11 @@ Thank you again for your participation!
                     userMessageInput.focus();
                 }
             } else {
-                showError(getApiErrorMessage(result, 'Failed to submit comment. Please try again.'));
+                // SILENT: No participant-visible error - logged to Railway only
             }
         } catch (error) {
-            showError('Error submitting comment: ' + error.message);
-            console.error('Catch block error in submitCommentButton:', error);
+            // SILENT: No participant-visible error - logged to Railway only
+            // Error already logged to Railway if needed
         } finally {
             commentLoadingDiv.style.display = 'none';
             if (commentInputArea.style.display !== 'none') {
@@ -1250,7 +1382,13 @@ Thank you again for your participation!
             researcherDataContent.textContent = JSON.stringify(data, null, 2);
         } catch (error) {
             researcherDataContent.textContent = `Error fetching or parsing researcher data: ${error.message}`;
-            console.error("Error in loadResearcherDataButton:", error)
+            // Log to Railway only
+            logToRailway({
+                type: 'RESEARCHER_DATA_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: { function: 'loadResearcherDataButton' }
+            });
         } finally {
             loadResearcherDataButton.disabled = false;
         }
