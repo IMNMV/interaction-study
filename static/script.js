@@ -282,6 +282,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
 
+    // Update timer message based on current study state (called when time expired and state changes)
+    function updateTimerMessage() {
+        if (!timeExpired) return;
+        
+        const timerDisplay = document.getElementById('timer-display');
+        let timeExpiredMessage;
+        
+        if (assessmentAreaDiv.style.display === 'block') {
+            // State 3: Rating phase - user needs to submit confidence rating
+            timeExpiredMessage = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
+        } else if (typingIndicator.style.display === 'flex') {
+            // State 2: Waiting for AI response
+            timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
+        } else {
+            // State 1: Before sending message
+            timeExpiredMessage = 'Time limit reached! Please send your message to receive your last response to judge.';
+        }
+        
+        timerDisplay.innerHTML = timeExpiredMessage;
+    }
+
     // Start the 20-minute countdown timer
     function startStudyTimer() {
         studyStartTime = Date.now();
@@ -316,21 +337,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
                 
-                // Dynamic message based on current study state
-                let timeExpiredMessage;
+                // Set initial timer message and show error if in rating phase
+                updateTimerMessage();
                 if (assessmentAreaDiv.style.display === 'block') {
-                    // State 3: Rating phase - user needs to submit confidence rating
-                    timeExpiredMessage = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
                     showError('Time expired! Your next rating must be a final decision (0 = Human or 1 = AI).');
-                } else if (typingIndicator.style.display === 'flex') {
-                    // State 2: Waiting for AI response
-                    timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
-                } else {
-                    // State 1: Before sending message
-                    timeExpiredMessage = 'Time limit reached! Please send your message to receive your last response to judge.';
                 }
-                
-                timerDisplay.innerHTML = timeExpiredMessage;
             }
         }, 1000);
     }
@@ -901,8 +912,14 @@ Thank you again for your participation!
         
         confidenceValueSpan.textContent = value.toFixed(2);
 
-        // ANY interaction with the slider enables the submit button.
-        submitRatingButton.disabled = false;
+        // Enable submit button, but only allow final decisions when time expired
+        if (timeExpired) {
+            // Only enable if slider is exactly 0.0 or 1.0 after time expires
+            submitRatingButton.disabled = !(value === 0.0 || value === 1.0);
+        } else {
+            // Normal operation - any interaction enables submission
+            submitRatingButton.disabled = false;
+        }
     });
 
     function animateTypingIndicator(messageLength) {
@@ -946,6 +963,8 @@ Thank you again for your participation!
             if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
                 // Start the typing animation with periodic pauses
                 animateTypingIndicator(messageText.length);
+                // Update timer message for State 1→2 transition (now waiting for AI response)
+                updateTimerMessage();
             }
         }, indicatorDelay);
 
@@ -993,6 +1012,9 @@ Thank you again for your participation!
                 assessmentAreaDiv.style.display = 'block';
                 chatInputContainer.style.display = 'none'; 
                 assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
+                
+                // Update timer message for State 2→3 transition (now rating phase)
+                updateTimerMessage();
                 
                 // NEW: Reset timing variables for this turn
                 confidenceStartTime = null;
@@ -1081,7 +1103,29 @@ Thank you again for your participation!
         // NEW: Block non-final submissions after time expires
         if (timeExpired) {
             const confidence = parseFloat(confidenceSlider.value);
-            if (confidence !== 0.0 && confidence !== 1.0) {
+            
+            // Use strict validation with tolerance for floating point precision
+            const isExactly0 = Math.abs(confidence - 0.0) < 0.001;
+            const isExactly1 = Math.abs(confidence - 1.0) < 0.001;
+            
+            // Log to Railway for debugging
+            logToRailway({
+                type: 'TIME_EXPIRED_VALIDATION',
+                message: `Time expired validation check`,
+                context: {
+                    timeExpired: timeExpired,
+                    confidence: confidence,
+                    slider_value_raw: confidenceSlider.value,
+                    is_exactly_0_strict: confidence === 0.0,
+                    is_exactly_1_strict: confidence === 1.0,
+                    is_exactly_0_tolerance: isExactly0,
+                    is_exactly_1_tolerance: isExactly1,
+                    will_block_strict: (confidence !== 0.0 && confidence !== 1.0),
+                    will_block_tolerance: (!isExactly0 && !isExactly1)
+                }
+            });
+            
+            if (!isExactly0 && !isExactly1) {
                 showError('Time expired! You must select exactly 0 (Human) or 1 (AI) to continue.');
                 return; // Block the submission
             }
@@ -1196,6 +1240,9 @@ Thank you again for your participation!
                         userMessageInput.disabled = false;
                         sendMessageButton.disabled = false;
                         userMessageInput.focus();
+                        
+                        // Update timer message for State 3→1 transition (back to chat input)
+                        updateTimerMessage();
                     }
                 }
             } else { 
