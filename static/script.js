@@ -938,6 +938,77 @@ Thank you again for your participation!
 
 
 
+    // NEW: Retry logic for API requests
+    async function sendMessageWithRetry(messageText, maxRetries = 3) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Log retry attempt to Railway
+                logToRailway({
+                    type: 'API_REQUEST_ATTEMPT',
+                    message: `Sending message to server (attempt ${attempt}/${maxRetries})`,
+                    context: { 
+                        session_id: sessionId, 
+                        message_length: messageText.length,
+                        attempt: attempt,
+                        max_retries: maxRetries
+                    }
+                });
+
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, message: messageText }),
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Success - log and return
+                    logToRailway({
+                        type: 'API_RESPONSE_SUCCESS',
+                        message: `Received response from /send_message (attempt ${attempt})`,
+                        context: { 
+                            response_ok: response.ok,
+                            turn: result.turn,
+                            ai_response_length: result.ai_response ? result.ai_response.length : 0,
+                            attempt: attempt
+                        }
+                    });
+                    return { response, result };
+                } else {
+                    // API error - log and continue to retry
+                    logToRailway({
+                        type: 'API_ERROR',
+                        message: `API error on attempt ${attempt}/${maxRetries}`,
+                        context: { 
+                            response_ok: response.ok,
+                            response_status: response.status,
+                            result: result,
+                            attempt: attempt
+                        }
+                    });
+                    if (attempt === maxRetries) throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                }
+            } catch (error) {
+                // Network/fetch error - log and continue to retry
+                logToRailway({
+                    type: 'NETWORK_ERROR',
+                    message: `Network error on attempt ${attempt}/${maxRetries}: ${error.message}`,
+                    context: { 
+                        error_name: error.name,
+                        error_message: error.message,
+                        attempt: attempt,
+                        max_retries: maxRetries
+                    }
+                });
+                if (attempt === maxRetries) throw error;
+                
+                // Wait before retry (exponential backoff)
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
     async function handleSendMessage() {
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
@@ -968,57 +1039,30 @@ Thank you again for your participation!
             }
         }, indicatorDelay);
 
-        // Log to Railway only
-        logToRailway({
-            type: 'API_REQUEST',
-            message: 'Sending message to server',
-            context: { 
-                session_id: sessionId, 
-                message_length: messageText.length,
-                endpoint: '/send_message'
-            }
-        });
-
         try {
-            const response = await fetch('/send_message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, message: messageText }),
-            });
-            const result = await response.json();
-            // Log to Railway only
-            logToRailway({
-                type: 'API_RESPONSE',
-                message: 'Received response from /send_message',
-                context: { 
-                    response_ok: response.ok,
-                    turn: result.turn,
-                    ai_response_length: result.ai_response ? result.ai_response.length : 0
-                }
-            });
-
-            // Bump runId so pending timeouts won't bring the indicator back
+            // Use new retry logic
+            const { response, result } = await sendMessageWithRetry(messageText);
+            
+            // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
             typingIndicator.style.display = 'none';
-
-            // Typing indicator hidden - no logging needed
-
-            if (response.ok) {
-                addMessageToUI(result.ai_response, 'assistant');
-                currentTurn = result.turn;
-                aiResponseTimestamp = result.timestamp;
-                
-                // --- MODIFIED: Slider setup logic ---
-                assessmentAreaDiv.style.display = 'block';
-                chatInputContainer.style.display = 'none'; 
-                assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
-                
-                // Update timer message for State 2→3 transition (now rating phase)
-                updateTimerMessage();
-                
-                // NEW: Reset timing variables for this turn
-                confidenceStartTime = null;
-                sliderInteractionLog = [];
+            
+            // Process the successful response
+            addMessageToUI(result.ai_response, 'assistant');
+            currentTurn = result.turn;
+            aiResponseTimestamp = result.timestamp;
+            
+            // --- MODIFIED: Slider setup logic ---
+            assessmentAreaDiv.style.display = 'block';
+            chatInputContainer.style.display = 'none'; 
+            assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
+            
+            // Update timer message for State 2→3 transition (now rating phase)
+            updateTimerMessage();
+            
+            // NEW: Reset timing variables for this turn
+            confidenceStartTime = null;
+            sliderInteractionLog = [];
                 
                 if (timeExpired) {
                     // Final turn: Force slider to 0.5 and require 0 or 1 selection
@@ -1053,46 +1097,30 @@ Thank you again for your participation!
                 feelsOffCommentTextarea.value = '';
                 messageList.scrollTop = messageList.scrollHeight;
 
-            } else { 
-                // Log API error to Railway
-                logToRailway({
-                    type: 'API_ERROR',
-                    message: getApiErrorMessage(result, 'Failed to send message or get AI response.'),
-                    context: { 
-                        response_ok: response.ok,
-                        response_status: response.status,
-                        result: result
-                    }
-                });
-                
-                // SILENT: No participant-visible error - logged to Railway only
-                // REMOVED: addMessageToUI - don't contaminate conversation log with error messages
-                userMessageInput.disabled = false;
-                sendMessageButton.disabled = false;
-                chatInputContainer.style.display = 'flex';
-                assessmentAreaDiv.style.display = 'none';
-            }
         } catch (error) {
-            // Log frontend error to Railway
+            // If we reach here, all retries failed - log the final failure
             logToRailway({
-                type: error.name || 'FRONTEND_ERROR',
-                message: error.message,
+                type: 'CRITICAL_FAILURE',
+                message: `All retries failed: ${error.message}`,
                 stack: error.stack,
                 context: {
                     function: 'handleSendMessage',
                     time_expired: timeExpired,
-                    user_message_length: userMessageInput.value.length
+                    user_message_length: messageText.length,
+                    final_error: true
                 }
             });
             
-            // SILENT: No participant-visible error - logged to Railway only
-            // Error already logged to Railway via logToRailway() above
+            // Hide typing indicator and reset UI - but keep conversation going
+            // The user can send another message to continue
             typingIndicator.style.display = 'none';
-            // REMOVED: addMessageToUI - don't contaminate conversation log with error messages
             userMessageInput.disabled = false;
             sendMessageButton.disabled = false;
             chatInputContainer.style.display = 'flex';
             assessmentAreaDiv.style.display = 'none';
+            
+            // IMPORTANT: We don't show any error to the user
+            // They can just send another message and the conversation continues
         }
     }
 
