@@ -1065,12 +1065,12 @@ Thank you again for your participation!
             sliderInteractionLog = [];
                 
                 if (timeExpired) {
-                    // Final turn: Force slider to 0.5 and require 0 or 1 selection
-                    confidenceSlider.value = 0.5;
-                    sliderStartValueThisTurn = 0.5;
+                    // Final turn: Show last value as visual reference, but require 0 or 1 selection
+                    confidenceSlider.value = lastConfidenceValue;
+                    sliderStartValueThisTurn = lastConfidenceValue;
                     confidenceSlider.classList.remove('pristine');
                     confidenceValueSpan.style.display = 'inline';
-                    confidenceValueSpan.textContent = '0.50';
+                    confidenceValueSpan.textContent = lastConfidenceValue.toFixed(2);
                     submitRatingButton.disabled = true; // Must move to 0 or 1 to enable
                 } else {
                     confidenceSlider.value = lastConfidenceValue; // Set to last submitted value
