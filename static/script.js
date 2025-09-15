@@ -1021,7 +1021,7 @@ Thank you again for your participation!
         chatInputContainer.style.display = 'none';
         assessmentAreaDiv.style.display = 'none';
 
-        const indicatorDelay = Math.random() * (5000 - 2000) + 2000;
+        const indicatorDelay = Math.random() * (7000 - 5000) + 5000;
         
         // Log to Railway only
         logToRailway({
