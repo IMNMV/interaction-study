@@ -954,11 +954,18 @@ Thank you again for your participation!
                     }
                 });
 
+                // Create AbortController for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+                
                 const response = await fetch('/send_message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: sessionId, message: messageText }),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 const result = await response.json();
 
                 if (response.ok) {
@@ -1215,6 +1222,10 @@ Thank you again for your participation!
         });
 
         try {
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds for rating submission
+            
             const response = await fetch('/submit_rating', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1226,7 +1237,10 @@ Thank you again for your participation!
                     active_decision_time_seconds: activeDecisionTimeSeconds,
                     slider_interaction_log: sliderInteractionLog
                 }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             const result = await response.json();
             // Log to Railway only
             logToRailway({
