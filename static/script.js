@@ -69,9 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContainer = document.querySelector('.container'); // For the disagree message
 
     // 1. Prolific Placeholder URLs
-    const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=CR0KFVQO";
-    const PROLIFIC_REJECTION_URL = "https://app.prolific.com/submissions/complete?cc=C120SCQ9";
-    const PROLIFIC_TIMED_OUT_URL = "https://app.prolific.com/submissions/complete?cc=C1B54A7Q";
+    const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=TBD";
+    const PROLIFIC_REJECTION_URL = "https://app.prolific.com/submissions/complete?cc=TBD";
+    const PROLIFIC_TIMED_OUT_URL = "https://app.prolific.com/submissions/complete?cc=TBD";
 
 
     // 2. Production Mode Check
