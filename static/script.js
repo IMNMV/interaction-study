@@ -1037,20 +1037,18 @@ Thank you again for your participation!
             context: { delay_seconds: indicatorDelay/1000 }
         });
         
-        try {
-            // Wait for BOTH the API response AND the minimum indicator delay
-            const [apiResult, _] = await Promise.all([
-                sendMessageWithRetry(messageText),
-                new Promise(resolve => setTimeout(resolve, indicatorDelay))
-            ]);
-            
-            const { response, result } = apiResult;
-            
-            // Show typing indicator when response is ready to display
+        setTimeout(() => {
             if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
+                // Start the typing animation with periodic pauses
                 animateTypingIndicator(messageText.length);
+                // Update timer message for State 1→2 transition (now waiting for AI response)
                 updateTimerMessage();
             }
+        }, indicatorDelay);
+
+        try {
+            // Use new retry logic
+            const { response, result } = await sendMessageWithRetry(messageText);
             
             // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
