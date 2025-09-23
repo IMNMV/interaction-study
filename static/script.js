@@ -1047,8 +1047,15 @@ Thank you again for your participation!
         }, indicatorDelay);
 
         try {
+            // Track network delay from API call to message display
+            const apiCallStartTime = Date.now();
+            
             // Use new retry logic
             const { response, result } = await sendMessageWithRetry(messageText);
+            
+            // Calculate network delay after receiving response
+            const apiCallEndTime = Date.now();
+            const networkDelayMs = apiCallEndTime - apiCallStartTime;
             
             // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
@@ -1056,6 +1063,18 @@ Thank you again for your participation!
             
             // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
+            
+            // Log network timing data
+            logToRailway({
+                type: 'NETWORK_TIMING',
+                message: 'Network delay from API call to message display',
+                context: {
+                    network_delay_ms: networkDelayMs,
+                    network_delay_seconds: networkDelayMs / 1000,
+                    turn: result.turn,
+                    session_id: sessionId
+                }
+            });
             currentTurn = result.turn;
             aiResponseTimestamp = result.timestamp;
             
