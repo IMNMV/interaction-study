@@ -280,6 +280,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // NEW: log when conversation actually starts (timer begins)
+    async function logConversationStart() {
+        try {
+            await fetch('/log_conversation_start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId
+                })
+            });
+            
+            logToRailway({
+                type: 'CONVERSATION_START',
+                message: 'Conversation timer started - actual chat beginning',
+                context: { session_id: sessionId }
+            });
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+            logToRailway({
+                type: 'CONVERSATION_START_ERROR',
+                message: 'Failed to log conversation start',
+                context: { error: e.message }
+            });
+        }
+    }
+
     
 
     // Update timer message based on current study state (called when time expired and state changes)
@@ -366,8 +392,11 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessageButton.disabled = false;
             userMessageInput.focus();
             
-            // START THE 20-MINUTE TIMER
+            // START THE 7.5-MINUTE TIMER AND LOG CONVERSATION START
             startStudyTimer();
+            
+            // Log when conversation actually begins
+            logConversationStart();
         }
     }
 
