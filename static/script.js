@@ -939,7 +939,7 @@ Thank you again for your participation!
 
 
     // NEW: Retry logic for API requests
-    async function sendMessageWithRetry(messageText, maxRetries = 3) {
+    async function sendMessageWithRetry(messageText, typingDelaySeconds, maxRetries = 3) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // Log retry attempt to Railway
@@ -961,7 +961,11 @@ Thank you again for your participation!
                 const response = await fetch('/send_message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId, message: messageText }),
+                    body: JSON.stringify({ 
+                        session_id: sessionId, 
+                        message: messageText,
+                        typing_indicator_delay_seconds: typingDelaySeconds 
+                    }),
                     signal: controller.signal
                 });
                 
@@ -1051,7 +1055,7 @@ Thank you again for your participation!
             const apiCallStartTime = Date.now();
             
             // Use new retry logic
-            const { response, result } = await sendMessageWithRetry(messageText);
+            const { response, result } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
             
             // Calculate network delay after receiving response
             const apiCallEndTime = Date.now();
