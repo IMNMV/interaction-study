@@ -1013,9 +1013,7 @@ Thank you again for your participation!
                 });
                 if (attempt === maxRetries) throw error;
                 
-                // Wait before retry (exponential backoff)
-                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-                await new Promise(resolve => setTimeout(resolve, delay));
+                // No delay - retry immediately
             }
         }
     }
