@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let studyTimer = null;
     let studyStartTime = null;
     let timeExpired = false;
-    const STUDY_DURATION_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
+    const STUDY_DURATION_MS = 7.5 * 60 * 1000; // 7.5 minutes in milliseconds
 
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Change color when time is running out
             if (remaining <= 60000) { // Last minute - red
                 timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
-            } else if (remaining <= 300000) { // Last 5 minutes - orange
+            } else if (remaining <= 180000) { // Last 3 minutes - orange
                 timerDisplay.style.background = 'rgba(255, 193, 7, 0.9)';
             }
             
