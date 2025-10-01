@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END LIKERT BUBBLE HANDLERS ---
 
     // We generate a client-side ID for the consent form filename before the server gives us a session ID.
-    const participantId = self.crypto.randomUUID(); 
+    const participantId = self.crypto.randomUUID();
     // Try to compute prolificPid from URL parameters if present
     const urlParams = new URLSearchParams(window.location.search);
     const prolificPid = urlParams.get('PROLIFIC_PID') || urlParams.get('prolific_pid') || urlParams.get('prolificPID') || null;
@@ -967,16 +967,18 @@ Thank you again for your participation!
 
 
 
-    // NEW: Retry logic for API requests
+    // NEW: Retry logic for API requests - now returns network delay
     async function sendMessageWithRetry(messageText, typingDelaySeconds, maxRetries = 3) {
+        const apiCallStartTime = Date.now();
+        
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // Log retry attempt to Railway
                 logToRailway({
                     type: 'API_REQUEST_ATTEMPT',
                     message: `Sending message to server (attempt ${attempt}/${maxRetries})`,
-                    context: { 
-                        session_id: sessionId, 
+                    context: {
+                        session_id: sessionId,
                         message_length: messageText.length,
                         attempt: attempt,
                         max_retries: maxRetries
@@ -990,10 +992,10 @@ Thank you again for your participation!
                 const response = await fetch('/send_message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        session_id: sessionId, 
+                    body: JSON.stringify({
+                        session_id: sessionId,
                         message: messageText,
-                        typing_indicator_delay_seconds: typingDelaySeconds 
+                        typing_indicator_delay_seconds: typingDelaySeconds
                     }),
                     signal: controller.signal
                 });
@@ -1002,24 +1004,31 @@ Thank you again for your participation!
                 const result = await response.json();
 
                 if (response.ok) {
-                    // Success - log and return
+                    // Calculate network delay for successful response
+                    const apiCallEndTime = Date.now();
+                    const networkDelayMs = apiCallEndTime - apiCallStartTime;
+                    const networkDelaySeconds = networkDelayMs / 1000;
+                    
+                    // Success - log and return with network delay
                     logToRailway({
                         type: 'API_RESPONSE_SUCCESS',
                         message: `Received response from /send_message (attempt ${attempt})`,
-                        context: { 
+                        context: {
                             response_ok: response.ok,
                             turn: result.turn,
                             ai_response_length: result.ai_response ? result.ai_response.length : 0,
-                            attempt: attempt
+                            attempt: attempt,
+                            network_delay_ms: networkDelayMs,
+                            network_delay_seconds: networkDelaySeconds
                         }
                     });
-                    return { response, result };
+                    return { response, result, networkDelaySeconds };
                 } else {
                     // API error - log and continue to retry
                     logToRailway({
                         type: 'API_ERROR',
                         message: `API error on attempt ${attempt}/${maxRetries}`,
-                        context: { 
+                        context: {
                             response_ok: response.ok,
                             response_status: response.status,
                             result: result,
@@ -1033,7 +1042,7 @@ Thank you again for your participation!
                 logToRailway({
                     type: 'NETWORK_ERROR',
                     message: `Network error on attempt ${attempt}/${maxRetries}: ${error.message}`,
-                    context: { 
+                    context: {
                         error_name: error.name,
                         error_message: error.message,
                         attempt: attempt,
@@ -1078,15 +1087,8 @@ Thank you again for your participation!
         }, indicatorDelay);
 
         try {
-            // Track network delay from API call to message display
-            const apiCallStartTime = Date.now();
-            
-            // Use new retry logic
-            const { response, result } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
-            
-            // Calculate network delay after receiving response
-            const apiCallEndTime = Date.now();
-            const networkDelayMs = apiCallEndTime - apiCallStartTime;
+            // Use new retry logic that returns network delay
+            const { response, result, networkDelaySeconds } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
             
             // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
@@ -1095,23 +1097,48 @@ Thank you again for your participation!
             // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
             
-            // Log network timing data
-            logToRailway({
-                type: 'NETWORK_TIMING',
-                message: 'Network delay from API call to message display',
-                context: {
-                    network_delay_ms: networkDelayMs,
-                    network_delay_seconds: networkDelayMs / 1000,
-                    turn: result.turn,
-                    session_id: sessionId
-                }
-            });
+            // Update the backend with network delay data
+            try {
+                await fetch('/update_network_delay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        turn: result.turn,
+                        network_delay_seconds: networkDelaySeconds
+                    })
+                });
+                
+                // Log successful network delay update
+                logToRailway({
+                    type: 'NETWORK_DELAY_UPDATED',
+                    message: 'Network delay successfully updated in database',
+                    context: {
+                        network_delay_seconds: networkDelaySeconds,
+                        turn: result.turn,
+                        session_id: sessionId
+                    }
+                });
+            } catch (updateError) {
+                // Log failed network delay update but don't interrupt the conversation
+                logToRailway({
+                    type: 'NETWORK_DELAY_UPDATE_ERROR',
+                    message: 'Failed to update network delay in database',
+                    context: {
+                        error: updateError.message,
+                        network_delay_seconds: networkDelaySeconds,
+                        turn: result.turn,
+                        session_id: sessionId
+                    }
+                });
+            }
+            
             currentTurn = result.turn;
             aiResponseTimestamp = result.timestamp;
             
             // --- MODIFIED: Slider setup logic ---
             assessmentAreaDiv.style.display = 'block';
-            chatInputContainer.style.display = 'none'; 
+            chatInputContainer.style.display = 'none';
             assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
             
             // Update timer message for State 2→3 transition (now rating phase)
@@ -1279,9 +1306,9 @@ Thank you again for your participation!
             const response = await fetch('/submit_rating', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    session_id: sessionId, 
-                    confidence: confidence, 
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    confidence: confidence,
                     decision_time_seconds: decisionTimeSeconds,
                     reading_time_seconds: readingTimeSeconds,
                     active_decision_time_seconds: activeDecisionTimeSeconds,
@@ -1337,12 +1364,12 @@ Thank you again for your participation!
                         updateTimerMessage();
                     }
                 }
-            } else { 
+            } else {
                 // SILENT: No participant-visible error - logged to Railway only
                 submitRatingButton.disabled = false;
                 confidenceSlider.disabled = false;
             }
-        } catch (error) { 
+        } catch (error) {
             // SILENT: No participant-visible error - logged to Railway only
             // Error already logged to Railway if needed
             submitRatingButton.disabled = false;
@@ -1363,8 +1390,8 @@ Thank you again for your participation!
                 await fetch('/submit_final_comment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        session_id: sessionId, 
+                    body: JSON.stringify({
+                        session_id: sessionId,
                         comment: commentText
                     }),
                 });
@@ -1496,7 +1523,7 @@ Thank you again for your participation!
 
         researcherDataSection.style.display = 'none';
         researcherDataContent.textContent = '';
-        showMainPhase('consent'); 
+        showMainPhase('consent');
         //  reset the consent form's state for the new session
         consentContentDiv.style.display = 'block';
         consentActionsDiv.style.display = 'block';
