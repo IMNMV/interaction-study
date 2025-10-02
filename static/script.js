@@ -1399,8 +1399,13 @@ Thank you again for your participation!
             
             decisionTimeSeconds = (Date.now() - baseMs) / 1000;
             if (confidenceStartTime) {
+                // User touched slider: split into reading + active time
                 readingTimeSeconds = (confidenceStartTime - baseMs) / 1000;
                 activeDecisionTimeSeconds = (Date.now() - confidenceStartTime) / 1000;
+            } else {
+                // User never touched slider: all time is reading, zero active
+                readingTimeSeconds = decisionTimeSeconds;
+                activeDecisionTimeSeconds = 0;
             }
         } else {
             // Log to Railway only
