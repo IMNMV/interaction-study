@@ -165,6 +165,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let confidenceStartTime = null; // When they first touch the slider
     let sliderInteractionLog = []; // Log of all slider interactions
     
+    // NEW: Fallback storage for failed network delay updates
+    let pendingNetworkDelayUpdates = []; // Store failed updates for later retry
+    
     // Timer variables
     let studyTimer = null;
     let studyStartTime = null;
@@ -1056,6 +1059,134 @@ Thank you again for your participation!
         }
     }
 
+    // NEW: Retry logic for network delay updates with fallback storage and metadata tracking
+    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, maxRetries = 3) {
+        const metadata = {
+            status: null,
+            attempts_required: 0,
+            failure_types: [],
+            fallback_reason: null,
+            retry_delays: []
+        };
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            metadata.attempts_required = attempt;
+            try {
+                logToRailway({
+                    type: 'NETWORK_DELAY_UPDATE_ATTEMPT',
+                    message: `Updating network delay (attempt ${attempt}/${maxRetries})`,
+                    context: {
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        attempt: attempt
+                    }
+                });
+
+                // Create AbortController for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+                
+                const response = await fetch('/update_network_delay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        metadata: metadata
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    // Success - set status and return metadata
+                    metadata.status = attempt === 1 ? 'primary_success' : 'retry_success';
+                    logToRailway({
+                        type: 'NETWORK_DELAY_UPDATED',
+                        message: `Network delay successfully updated (attempt ${attempt})`,
+                        context: {
+                            network_delay_seconds: networkDelaySeconds,
+                            turn: turn,
+                            session_id: sessionId,
+                            attempt: attempt,
+                            metadata: metadata
+                        }
+                    });
+                    return { success: true, metadata };
+                } else {
+                    // API error - track error type and continue to retry
+                    const errorType = `${response.status}_error`;
+                    metadata.failure_types.push(errorType);
+                    
+                    logToRailway({
+                        type: 'NETWORK_DELAY_API_ERROR',
+                        message: `Network delay update API error (attempt ${attempt}/${maxRetries})`,
+                        context: {
+                            response_status: response.status,
+                            attempt: attempt,
+                            turn: turn,
+                            error_type: errorType
+                        }
+                    });
+                    if (attempt === maxRetries) throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                }
+            } catch (error) {
+                // Network/fetch error - track error type and continue to retry
+                const errorType = error.name === 'AbortError' ? 'timeout' : 
+                                 error.name === 'TypeError' ? 'network_error' : 
+                                 error.name || 'unknown_error';
+                metadata.failure_types.push(errorType);
+                
+                logToRailway({
+                    type: 'NETWORK_DELAY_NETWORK_ERROR',
+                    message: `Network delay update network error (attempt ${attempt}/${maxRetries}): ${error.message}`,
+                    context: {
+                        error_name: error.name,
+                        error_message: error.message,
+                        error_type: errorType,
+                        attempt: attempt,
+                        turn: turn
+                    }
+                });
+                
+                if (attempt === maxRetries) {
+                    // All retries failed - set fallback status and store for fallback
+                    metadata.status = 'fallback_used';
+                    metadata.fallback_reason = `All ${maxRetries} retries failed: ${error.message}`;
+                    
+                    const fallbackData = {
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        failure_reason: error.message,
+                        calculated_at: Date.now(),
+                        retry_attempts: maxRetries,
+                        metadata: metadata
+                    };
+                    pendingNetworkDelayUpdates.push(fallbackData);
+                    
+                    logToRailway({
+                        type: 'NETWORK_DELAY_FALLBACK_STORED',
+                        message: 'All retries failed - stored for fallback processing',
+                        context: {
+                            fallback_data: fallbackData,
+                            pending_count: pendingNetworkDelayUpdates.length
+                        }
+                    });
+                    return { success: false, metadata };
+                }
+                
+                // Wait briefly before retry (exponential backoff)
+                const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+                metadata.retry_delays.push(backoffMs);
+                await new Promise(resolve => setTimeout(resolve, backoffMs));
+            }
+        }
+    }
+
     async function handleSendMessage() {
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
@@ -1097,38 +1228,20 @@ Thank you again for your participation!
             // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
             
-            // Update the backend with network delay data
-            try {
-                await fetch('/update_network_delay', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+            // Update the backend with network delay data using retry logic
+            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, networkDelaySeconds);
+            
+            if (!updateResult.success) {
+                // All retries failed - data is stored in pendingNetworkDelayUpdates for later processing
+                logToRailway({
+                    type: 'NETWORK_DELAY_FINAL_FAILURE',
+                    message: 'Network delay update failed after all retries - stored for fallback',
+                    context: {
+                        network_delay_seconds: networkDelaySeconds,
+                        turn: result.turn,
                         session_id: sessionId,
-                        turn: result.turn,
-                        network_delay_seconds: networkDelaySeconds
-                    })
-                });
-                
-                // Log successful network delay update
-                logToRailway({
-                    type: 'NETWORK_DELAY_UPDATED',
-                    message: 'Network delay successfully updated in database',
-                    context: {
-                        network_delay_seconds: networkDelaySeconds,
-                        turn: result.turn,
-                        session_id: sessionId
-                    }
-                });
-            } catch (updateError) {
-                // Log failed network delay update but don't interrupt the conversation
-                logToRailway({
-                    type: 'NETWORK_DELAY_UPDATE_ERROR',
-                    message: 'Failed to update network delay in database',
-                    context: {
-                        error: updateError.message,
-                        network_delay_seconds: networkDelaySeconds,
-                        turn: result.turn,
-                        session_id: sessionId
+                        pending_fallbacks: pendingNetworkDelayUpdates.length,
+                        metadata: updateResult.metadata
                     }
                 });
             }
