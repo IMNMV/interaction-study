@@ -174,6 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let timeExpired = false;
     const STUDY_DURATION_MS = 7.5 * 60 * 1000; // 7.5 minutes in milliseconds
 
+    // NEW: Tab visibility tracking
+    let tabHiddenStartTime = null;
+    let cumulativeTabHiddenMs = 0;
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
     const allSliders = document.querySelectorAll('#initial-form input[type="range"]');
@@ -1025,7 +1028,7 @@ Thank you again for your participation!
                             network_delay_seconds: networkDelaySeconds
                         }
                     });
-                    return { response, result, networkDelaySeconds };
+                    return { response, result, networkDelaySeconds, attempts: attempt };
                 } else {
                     // API error - log and continue to retry
                     logToRailway({
@@ -1060,7 +1063,7 @@ Thank you again for your participation!
     }
 
     // NEW: Retry logic for network delay updates with fallback storage and metadata tracking
-    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, maxRetries = 3) {
+    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, maxRetries = 3) {
         const metadata = {
             status: null,
             attempts_required: 0,
@@ -1094,6 +1097,7 @@ Thank you again for your participation!
                         session_id: sessionId,
                         turn: turn,
                         network_delay_seconds: networkDelaySeconds,
+                        send_attempts: sendAttempts,
                         metadata: metadata
                     }),
                     signal: controller.signal
@@ -1218,18 +1222,18 @@ Thank you again for your participation!
         }, indicatorDelay);
 
         try {
-            // Use new retry logic that returns network delay
-            const { response, result, networkDelaySeconds } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
-            
+            // Use new retry logic that returns network delay and attempt count
+            const { response, result, networkDelaySeconds, attempts } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
+
             // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
             typingIndicator.style.display = 'none';
-            
+
             // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
-            
-            // Update the backend with network delay data using retry logic
-            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, networkDelaySeconds);
+
+            // Update the backend with network delay data AND send attempts using retry logic
+            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, networkDelaySeconds, attempts);
             
             if (!updateResult.success) {
                 // All retries failed - data is stored in pendingNetworkDelayUpdates for later processing
@@ -1248,7 +1252,10 @@ Thank you again for your participation!
             
             currentTurn = result.turn;
             aiResponseTimestamp = result.timestamp;
-            
+
+            // Reset tab visibility tracking for new turn
+            cumulativeTabHiddenMs = 0;
+
             // --- MODIFIED: Slider setup logic ---
             assessmentAreaDiv.style.display = 'block';
             chatInputContainer.style.display = 'none';
@@ -1351,6 +1358,12 @@ Thank you again for your participation!
             });
             
             if (!isExactly0 && !isExactly1) {
+                // Log invalid submit attempt
+                logUiEvent('invalid_submit_attempt', {
+                    turn: currentTurn,
+                    slider_value: confidence,
+                    time_expired: true
+                });
                 showError('Time expired! You must select exactly 0 (Human) or 1 (AI) to continue.');
                 return; // Block the submission
             }
@@ -1684,7 +1697,33 @@ Thank you again for your participation!
     logUiEvent('page_load', {
         userAgent: navigator.userAgent,
         language: navigator.language,
-        referrer: document.referrer || null
+        referrer: document.referrer || null,
+        isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+        screenWidth: screen.width,
+        screenHeight: screen.height
+    });
+
+    // NEW: Tab visibility tracking
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            tabHiddenStartTime = Date.now();
+            logUiEvent('tab_hidden', {
+                turn: currentTurn,
+                timestamp: tabHiddenStartTime
+            });
+        } else {
+            if (tabHiddenStartTime) {
+                const hiddenDuration = Date.now() - tabHiddenStartTime;
+                cumulativeTabHiddenMs += hiddenDuration;
+                logUiEvent('tab_visible', {
+                    turn: currentTurn,
+                    hidden_duration_ms: hiddenDuration,
+                    cumulative_hidden_ms: cumulativeTabHiddenMs,
+                    timestamp: Date.now()
+                });
+                tabHiddenStartTime = null;
+            }
+        }
     });
 
 });
