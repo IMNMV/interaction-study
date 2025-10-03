@@ -1001,8 +1001,7 @@ Thank you again for your participation!
                     body: JSON.stringify({
                         session_id: sessionId,
                         message: messageText,
-                        typing_indicator_delay_seconds: typingDelaySeconds,
-                        user_message_display_timestamp: userMessageDisplayTimestamp / 1000  // Convert to seconds
+                        typing_indicator_delay_seconds: typingDelaySeconds
                     }),
                     signal: controller.signal
                 });
@@ -1064,7 +1063,7 @@ Thank you again for your participation!
     }
 
     // NEW: Retry logic for network delay updates with fallback storage and metadata tracking
-    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, aiMessageDisplayTimestamp = null, maxRetries = 3) {
+    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, maxRetries = 3) {
         const metadata = {
             status: null,
             attempts_required: 0,
@@ -1099,7 +1098,6 @@ Thank you again for your participation!
                         turn: turn,
                         network_delay_seconds: networkDelaySeconds,
                         send_attempts: sendAttempts,
-                        ai_message_display_timestamp: aiMessageDisplayTimestamp,
                         metadata: metadata
                     }),
                     signal: controller.signal
@@ -1197,8 +1195,6 @@ Thank you again for your participation!
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
 
-        // Capture when user message is displayed
-        const userMessageDisplayTimestamp = Date.now();
         addMessageToUI(messageText, 'user');
 
         userMessageInput.value = '';
@@ -1233,8 +1229,7 @@ Thank you again for your participation!
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
             typingIndicator.style.display = 'none';
 
-            // Process the successful response and capture when AI message is displayed
-            const aiMessageDisplayTimestamp = Date.now();
+            // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
 
             // NEW: Add backend retry time and attempts to totals
@@ -1242,8 +1237,8 @@ Thank you again for your participation!
             const totalNetworkDelaySeconds = networkDelaySeconds + backendRetryData.retry_time_seconds;
             const totalAttempts = attempts + backendRetryData.retry_attempts;
 
-            // Update the backend with TOTAL network delay data, TOTAL send attempts, and AI display timestamp
-            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, totalNetworkDelaySeconds, totalAttempts, aiMessageDisplayTimestamp / 1000);
+            // Update the backend with TOTAL network delay data AND TOTAL send attempts using retry logic
+            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, totalNetworkDelaySeconds, totalAttempts);
             
             if (!updateResult.success) {
                 // All retries failed - data is stored in pendingNetworkDelayUpdates for later processing
