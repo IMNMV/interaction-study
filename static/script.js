@@ -1063,7 +1063,7 @@ Thank you again for your participation!
     }
 
     // NEW: Retry logic for network delay updates with fallback storage and metadata tracking
-    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, maxRetries = 3) {
+    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, maxRetries = 2) {
         const metadata = {
             status: null,
             attempts_required: 0,
@@ -1071,7 +1071,7 @@ Thank you again for your participation!
             fallback_reason: null,
             retry_delays: []
         };
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             metadata.attempts_required = attempt;
             try {
@@ -1088,7 +1088,7 @@ Thank you again for your participation!
 
                 // Create AbortController for timeout
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout (increased from 15s)
                 
                 const response = await fetch('/update_network_delay', {
                     method: 'POST',
@@ -1160,7 +1160,7 @@ Thank you again for your participation!
                     // All retries failed - set fallback status and store for fallback
                     metadata.status = 'fallback_used';
                     metadata.fallback_reason = `All ${maxRetries} retries failed: ${error.message}`;
-                    
+
                     const fallbackData = {
                         session_id: sessionId,
                         turn: turn,
@@ -1171,7 +1171,7 @@ Thank you again for your participation!
                         metadata: metadata
                     };
                     pendingNetworkDelayUpdates.push(fallbackData);
-                    
+
                     logToRailway({
                         type: 'NETWORK_DELAY_FALLBACK_STORED',
                         message: 'All retries failed - stored for fallback processing',
@@ -1182,9 +1182,9 @@ Thank you again for your participation!
                     });
                     return { success: false, metadata };
                 }
-                
-                // Wait briefly before retry (exponential backoff)
-                const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+
+                // Wait briefly before retry (reduced backoff)
+                const backoffMs = 2000; // Fixed 2 second delay instead of exponential
                 metadata.retry_delays.push(backoffMs);
                 await new Promise(resolve => setTimeout(resolve, backoffMs));
             }
