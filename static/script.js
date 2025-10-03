@@ -1232,8 +1232,13 @@ Thank you again for your participation!
             // Process the successful response
             addMessageToUI(result.ai_response, 'assistant');
 
-            // Update the backend with network delay data AND send attempts using retry logic
-            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, networkDelaySeconds, attempts);
+            // NEW: Add backend retry time and attempts to totals
+            const backendRetryData = result.backend_retry_metadata || { retry_attempts: 0, retry_time_seconds: 0 };
+            const totalNetworkDelaySeconds = networkDelaySeconds + backendRetryData.retry_time_seconds;
+            const totalAttempts = attempts + backendRetryData.retry_attempts;
+
+            // Update the backend with TOTAL network delay data AND TOTAL send attempts using retry logic
+            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, totalNetworkDelaySeconds, totalAttempts);
             
             if (!updateResult.success) {
                 // All retries failed - data is stored in pendingNetworkDelayUpdates for later processing
