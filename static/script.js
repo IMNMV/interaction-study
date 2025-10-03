@@ -572,7 +572,7 @@ If you agree to participate, you will:
 - After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI using a sliding scale (0 = definitely human, 1 = definitely AI).
 - Optionally provide brief comments about your experience during the conversation.
 - Complete a brief demographic questionnaire at the beginning.
-- The total time commitment will be approximately 20 minutes.
+- The total time commitment will be approximately 10 minutes.
 - You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.
 
 Your Rights as a Participant
