@@ -976,7 +976,7 @@ Thank you again for your participation!
     // NEW: Retry logic for API requests - now returns network delay
     async function sendMessageWithRetry(messageText, typingDelaySeconds, maxRetries = 3) {
         const apiCallStartTime = Date.now();
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // Log retry attempt to Railway
@@ -992,8 +992,9 @@ Thank you again for your participation!
                 });
 
                 // Create AbortController for timeout
+                // NEW: Reduced timeout to 60 seconds to prevent excessive waits
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout (reduced from 120s)
                 
                 const response = await fetch('/send_message', {
                     method: 'POST',
