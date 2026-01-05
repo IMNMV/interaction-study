@@ -157,12 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTurn = 0;
     let aiResponseTimestamp = null;
     let progressInterval; // Moved from inside the form listener
-    let lastConfidenceValue = 0.5; // NEW: To store the last submitted rating
-    let sliderStartValueThisTurn = 0.5; // NEW: To check if the slider has moved
+    let lastConfidenceValue = 50; // NEW: Changed to 50 (0-100 scale, default 50%)
     let finalSummaryData = null; // NEW: To store summary data before showing feedback form
-    
+
+    // NEW: Binary choice tracking variables
+    let binaryChoiceStartTime = null; // When AI message appears
+    let binaryChoice = null; // 'human' or 'ai'
+    let binaryChoiceTime = null; // Time taken to make binary choice
+    let buttonOrderRandomized = false; // For counterbalancing (currently disabled)
+
     // NEW: Enhanced reaction time tracking variables
-    let confidenceStartTime = null; // When they first touch the slider
+    let confidenceStartTime = null; // When they first touch the slider (after binary choice)
     let sliderInteractionLog = []; // Log of all slider interactions
     
     // NEW: Fallback storage for failed network delay updates
@@ -369,10 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
                 
-                // Set initial timer message and show error if in rating phase
+                // Set initial timer message and show message if in rating phase
                 updateTimerMessage();
                 if (assessmentAreaDiv.style.display === 'block') {
-                    showError('Time expired! Your next rating must be a final decision (0 = Human or 1 = AI).');
+                    // NEW: Updated message for binary choice system
+                    showError('Time expired! Please complete your final rating (binary choice + confidence) to finish the study.');
                 }
             }
         }, 1000);
@@ -886,6 +892,65 @@ Thank you again for your participation!
         }
     });
 
+    // NEW: Binary choice button event listeners
+    const choiceHumanButton = document.getElementById('choice-human-button');
+    const choiceAiButton = document.getElementById('choice-ai-button');
+    const binaryChoiceSection = document.getElementById('binary-choice-section');
+    const confidenceSection = document.getElementById('confidence-section');
+    const chosenLabel = document.getElementById('chosen-label');
+
+    // COMMENTED OUT: Counterbalancing button order - can be enabled if advisor approves
+    // function randomizeButtonOrder() {
+    //     const buttonsContainer = document.getElementById('binary-choice-buttons');
+    //     if (Math.random() < 0.5) {
+    //         buttonsContainer.appendChild(choiceHumanButton);
+    //         buttonsContainer.appendChild(choiceAiButton);
+    //         buttonOrderRandomized = false;
+    //     } else {
+    //         buttonsContainer.appendChild(choiceAiButton);
+    //         buttonsContainer.appendChild(choiceHumanButton);
+    //         buttonOrderRandomized = true;
+    //     }
+    // }
+    // randomizeButtonOrder(); // Call this when assessment area is first shown
+
+    choiceHumanButton.addEventListener('click', () => {
+        handleBinaryChoice('human');
+    });
+
+    choiceAiButton.addEventListener('click', () => {
+        handleBinaryChoice('ai');
+    });
+
+    function handleBinaryChoice(choice) {
+        // Record the choice and timing
+        binaryChoice = choice;
+        binaryChoiceTime = Date.now() - binaryChoiceStartTime;
+
+        // Log the choice
+        logToRailway({
+            type: 'BINARY_CHOICE_MADE',
+            message: `User selected: ${choice}`,
+            context: {
+                choice: choice,
+                time_taken_ms: binaryChoiceTime,
+                turn: currentTurn
+            }
+        });
+
+        // Hide binary choice, show confidence slider
+        binaryChoiceSection.style.display = 'none';
+        confidenceSection.style.display = 'block';
+        chosenLabel.textContent = choice.charAt(0).toUpperCase() + choice.slice(1);
+
+        // Reset confidence slider to 50% for new choice
+        confidenceSlider.value = 50;
+        confidenceValueSpan.textContent = '50';
+        confidenceStartTime = Date.now(); // Start tracking confidence slider timing
+        sliderInteractionLog = []; // Reset slider interaction log
+        submitRatingButton.disabled = false; // Enable submit button
+    }
+
     // NEW: Track when user first interacts with confidence slider
     confidenceSlider.addEventListener('mousedown', () => {
         const baseMs = tsToMs(aiResponseTimestamp);
@@ -915,14 +980,8 @@ Thank you again for your participation!
 
     // MODIFIED event listener for confidence slider to handle activation and enabling submit
     confidenceSlider.addEventListener('input', () => {
-        // On first interaction, remove the pristine class to show the thumb and value
-        if (confidenceSlider.classList.contains('pristine')) {
-            confidenceSlider.classList.remove('pristine');
-            confidenceValueSpan.style.display = 'inline';
-        }
+        let value = parseInt(confidenceSlider.value); // Now 0-100 scale
 
-        let value = parseFloat(confidenceSlider.value);
-        
         // NEW: Track all slider movements for enhanced timing analysis
         const baseMs = tsToMs(aiResponseTimestamp);
         if (confidenceStartTime && baseMs) {
@@ -934,27 +993,12 @@ Thank you again for your participation!
                 value: value
             });
         }
-        
-        // NEW: No more 5-turn minimum - allow 0.0/1.0 selection anytime
-        // (Removed the 5-turn restriction as requested)
-        
-        // After time expires, force only final decisions (0.0 or 1.0)
-        if (timeExpired && value !== 0.0 && value !== 1.0) {
-            // Snap to nearest final decision
-            value = value < 0.5 ? 0.0 : 1.0;
-            confidenceSlider.value = value;
-        }
-        
-        confidenceValueSpan.textContent = value.toFixed(2);
 
-        // Enable submit button, but only allow final decisions when time expired
-        if (timeExpired) {
-            // Only enable if slider is exactly 0.0 or 1.0 after time expires
-            submitRatingButton.disabled = !(value === 0.0 || value === 1.0);
-        } else {
-            // Normal operation - any interaction enables submission
-            submitRatingButton.disabled = false;
-        }
+        // Update the displayed value
+        confidenceValueSpan.textContent = value;
+
+        // Submit button is already enabled by handleBinaryChoice
+        // No special restrictions - any value 0-100 is valid
     });
 
     function animateTypingIndicator(messageLength) {
@@ -1262,50 +1306,36 @@ Thank you again for your participation!
             // Reset tab visibility tracking for new turn
             cumulativeTabHiddenMs = 0;
 
-            // --- MODIFIED: Slider setup logic ---
+            // --- MODIFIED: Binary choice + slider setup logic ---
             assessmentAreaDiv.style.display = 'block';
             chatInputContainer.style.display = 'none';
             assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
-            
+
             // Update timer message for State 2→3 transition (now rating phase)
             updateTimerMessage();
-            
-            // NEW: Reset timing variables for this turn
+
+            // NEW: Show binary choice section, hide confidence section
+            binaryChoiceSection.style.display = 'block';
+            confidenceSection.style.display = 'none';
+
+            // NEW: Reset binary choice tracking for new turn
+            binaryChoice = null;
+            binaryChoiceStartTime = Date.now(); // Start timing for binary choice
+            binaryChoiceTime = null;
+
+            // Reset timing variables for this turn
             confidenceStartTime = null;
             sliderInteractionLog = [];
-                
-                if (timeExpired) {
-                    // Final turn: Show last value as visual reference, but require 0 or 1 selection
-                    confidenceSlider.value = lastConfidenceValue;
-                    sliderStartValueThisTurn = lastConfidenceValue;
-                    confidenceSlider.classList.remove('pristine');
-                    confidenceValueSpan.style.display = 'inline';
-                    confidenceValueSpan.textContent = lastConfidenceValue.toFixed(2);
-                    submitRatingButton.disabled = true; // Must move to 0 or 1 to enable
-                } else {
-                    confidenceSlider.value = lastConfidenceValue; // Set to last submitted value
-                    sliderStartValueThisTurn = lastConfidenceValue; // Store it for the "must-move" check
 
-                    if (currentTurn === 1) {
-                        // First turn: hide thumb and value
-                        confidenceSlider.classList.add('pristine');
-                        confidenceValueSpan.style.display = 'none';
-                        submitRatingButton.disabled = true; // Must interact to enable
-                    } else {
-                        // Subsequent turns: show thumb and value, but disable submit until moved
-                        confidenceSlider.classList.remove('pristine');
-                        confidenceValueSpan.style.display = 'inline';
-                        confidenceValueSpan.textContent = lastConfidenceValue.toFixed(2);
-                        submitRatingButton.disabled = false; // Must move to enable
-                    }
-                }
+            // REMOVED: Old slider initialization logic - now handled by handleBinaryChoice()
+            // Slider is no longer shown initially - binary choice comes first
 
-                confidenceSlider.disabled = false;
-                submitRatingButton.style.display = 'block';
-                feelsOffCheckbox.checked = false;
-                commentInputArea.style.display = 'none';
-                feelsOffCommentTextarea.value = '';
-                messageList.scrollTop = messageList.scrollHeight;
+            // Reset other UI elements
+            submitRatingButton.style.display = 'block';
+            feelsOffCheckbox.checked = false;
+            commentInputArea.style.display = 'none';
+            feelsOffCommentTextarea.value = '';
+            messageList.scrollTop = messageList.scrollHeight;
 
         } catch (error) {
             // If we reach here, all retries failed - log the final failure
@@ -1338,42 +1368,18 @@ Thank you again for your participation!
     submitRatingButton.addEventListener('click', async () => {
         if (!sessionId) return;
 
-        // NEW: Block non-final submissions after time expires
-        if (timeExpired) {
-            const confidence = parseFloat(confidenceSlider.value);
-            
-            // Use strict validation with tolerance for floating point precision
-            const isExactly0 = Math.abs(confidence - 0.0) < 0.001;
-            const isExactly1 = Math.abs(confidence - 1.0) < 0.001;
-            
-            // Log to Railway for debugging
+        // NEW: Validate binary choice was made
+        if (!binaryChoice) {
             logToRailway({
-                type: 'TIME_EXPIRED_VALIDATION',
-                message: `Time expired validation check`,
-                context: {
-                    timeExpired: timeExpired,
-                    confidence: confidence,
-                    slider_value_raw: confidenceSlider.value,
-                    is_exactly_0_strict: confidence === 0.0,
-                    is_exactly_1_strict: confidence === 1.0,
-                    is_exactly_0_tolerance: isExactly0,
-                    is_exactly_1_tolerance: isExactly1,
-                    will_block_strict: (confidence !== 0.0 && confidence !== 1.0),
-                    will_block_tolerance: (!isExactly0 && !isExactly1)
-                }
+                type: 'SUBMIT_ERROR',
+                message: 'Submit attempt without binary choice',
+                context: { turn: currentTurn }
             });
-            
-            if (!isExactly0 && !isExactly1) {
-                // Log invalid submit attempt
-                logUiEvent('invalid_submit_attempt', {
-                    turn: currentTurn,
-                    slider_value: confidence,
-                    time_expired: true
-                });
-                showError('Time expired! You must select exactly 0 (Human) or 1 (AI) to continue.');
-                return; // Block the submission
-            }
+            return; // Should not happen due to UI flow, but safety check
         }
+
+        // NEW: For time expired, we no longer restrict confidence values
+        // The binary choice (Human/AI) is the main decision, confidence is always 0-100%
 
         if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() === '') {
             // SILENT: No participant-visible error - just prevent submission
@@ -1384,8 +1390,9 @@ Thank you again for your participation!
         submitRatingButton.disabled = true;
         confidenceSlider.disabled = true;
 
-        const confidence = parseFloat(confidenceSlider.value);
-        lastConfidenceValue = confidence; // NEW: Save the submitted value for the next round
+        const confidencePercent = parseInt(confidenceSlider.value); // 0-100 scale
+        const confidence = confidencePercent / 100; // Convert to 0-1 for backend compatibility
+        lastConfidenceValue = confidencePercent; // NEW: Save the submitted value (0-100) for the next round
 
         // NEW: Calculate enhanced timing data
         let decisionTimeSeconds = null;
@@ -1425,9 +1432,12 @@ Thank you again for your participation!
         // Log to Railway only
         logToRailway({
             type: 'RATING_SUBMISSION',
-            message: 'Submitting rating with timing metrics',
+            message: 'Submitting rating with binary choice and timing metrics',
             context: {
-                confidence: confidence,
+                binary_choice: binaryChoice,
+                binary_choice_time_ms: binaryChoiceTime,
+                confidence_percent: confidencePercent,
+                confidence_normalized: confidence,
                 decision_time_seconds: decisionTimeSeconds,
                 reading_time_seconds: readingTimeSeconds,
                 active_decision_time_seconds: activeDecisionTimeSeconds,
@@ -1439,13 +1449,16 @@ Thank you again for your participation!
             // Create AbortController for timeout
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds for rating submission
-            
+
             const response = await fetch('/submit_rating', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     session_id: sessionId,
-                    confidence: confidence,
+                    binary_choice: binaryChoice, // 'human' or 'ai'
+                    binary_choice_time_ms: binaryChoiceTime, // Time taken to make binary choice
+                    confidence: confidence, // 0-1 scale (converted from 0-100)
+                    confidence_percent: confidencePercent, // 0-100 scale (original)
                     decision_time_seconds: decisionTimeSeconds,
                     reading_time_seconds: readingTimeSeconds,
                     active_decision_time_seconds: activeDecisionTimeSeconds,
