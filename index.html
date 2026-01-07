@@ -261,6 +261,50 @@
                     <option value="prefer_not_say">Prefer not to say</option>
                 </select>
 
+                <label>Political affiliation:</label>
+                <select name="political_affiliation" required>
+                    <option value="" disabled selected>Select...</option>
+                    <option value="very_progressive">Very Progressive/Far Left</option>
+                    <option value="progressive">Progressive</option>
+                    <option value="liberal">Liberal</option>
+                    <option value="moderate_liberal">Moderate Liberal</option>
+                    <option value="moderate">Moderate/Centrist</option>
+                    <option value="moderate_conservative">Moderate Conservative</option>
+                    <option value="conservative">Conservative</option>
+                    <option value="very_conservative">Very Conservative/Far Right</option>
+                    <option value="libertarian">Libertarian</option>
+                    <option value="independent">Independent/No Affiliation</option>
+                    <option value="other">Other</option>
+                    <option value="prefer_not_say">Prefer not to say</option>
+                </select>
+
+                <label>Social media platforms you use (check all that apply):</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" name="social_media" value="x_twitter"> X (Twitter)</label>
+                    <label><input type="checkbox" name="social_media" value="facebook"> Facebook</label>
+                    <label><input type="checkbox" name="social_media" value="instagram"> Instagram</label>
+                    <label><input type="checkbox" name="social_media" value="tiktok"> TikTok</label>
+                    <label><input type="checkbox" name="social_media" value="reddit"> Reddit</label>
+                    <label><input type="checkbox" name="social_media" value="youtube"> YouTube</label>
+                    <label><input type="checkbox" name="social_media" value="linkedin"> LinkedIn</label>
+                    <label><input type="checkbox" name="social_media" value="snapchat"> Snapchat</label>
+                    <label><input type="checkbox" name="social_media" value="threads"> Threads</label>
+                    <label><input type="checkbox" name="social_media" value="bluesky"> Bluesky</label>
+                    <label><input type="checkbox" name="social_media" value="none"> None</label>
+                    <label><input type="checkbox" name="social_media" value="other"> Other</label>
+                </div>
+
+                <label>Hours of internet use per week:</label>
+                <select name="internet_usage_per_week" required>
+                    <option value="" disabled selected>Select...</option>
+                    <option value="1">Less than 1 hour</option>
+                    <option value="2">1-5 hours</option>
+                    <option value="3">6-10 hours</option>
+                    <option value="4">11-20 hours</option>
+                    <option value="5">21-40 hours</option>
+                    <option value="6">More than 40 hours</option>
+                </select>
+
                 <button type="submit">Begin Conversation</button>
             </form>
             <div id="init-loading" class="loading-message" style="display: none;">
