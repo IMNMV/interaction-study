@@ -790,9 +790,31 @@ Thank you again for your participation!
             return;
         }
         if (ethnicityVals.length === 0) {
-        showError("Please select at least one ethnicity option.");
-        return;
-    }
+            showError("Please select at least one ethnicity option.");
+            return;
+        }
+
+        // Validate new demographics
+        const politicalAffiliationVal = formData.get('political_affiliation');
+        if (!politicalAffiliationVal) {
+            showError("Please select your political affiliation.");
+            return;
+        }
+        const socialMediaVals = formData.getAll('social_media');
+        if (socialMediaVals.length === 0) {
+            showError("Please select at least one social media platform option (or 'None').");
+            return;
+        }
+        // Enforce 'None' as an exclusive selection
+        if (socialMediaVals.includes('none') && socialMediaVals.length > 1) {
+            showError("If you select 'None', please don’t select other platforms.");
+            return;
+        }
+        const internetUsageVal = formData.get('internet_usage_per_week');
+        if (!internetUsageVal) {
+            showError("Please select your hours of internet use per week.");
+            return;
+        }
 
         const data = {
             ai_usage_frequency: parseInt(ai_usage_frequency_val, 10),
@@ -806,7 +828,10 @@ Thank you again for your participation!
             education: educationVal,
             ethnicity: formData.getAll('ethnicity'),
             income: incomeVal,
-            // NEW: identifiers
+            political_affiliation: politicalAffiliationVal,
+            social_media_platforms: socialMediaVals,
+            internet_usage_per_week: parseInt(internetUsageVal, 10),
+            // Identifiers
             participant_id: participantId,
             prolific_pid: prolificPid
         };
