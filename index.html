@@ -1,463 +1,1773 @@
+// FILE: static/script.js
+// This is the corrected version with error handling improvements.
+// All console statements removed to prevent participant contamination.
+document.addEventListener('DOMContentLoaded', () => {
+    const initialSetupDiv = document.getElementById('initial-setup');
+    const chatInterfaceDiv = document.getElementById('chat-interface'); // Main div for chat + assessment
+    const assessmentAreaDiv = document.getElementById('assessment-area'); // Now inside chatInterfaceDiv
+    const finalPageDiv = document.getElementById('final-page');
+    const errorMessageArea = document.getElementById('error-message-area');
+    const instructionsPhaseDiv = document.getElementById('instructions-phase');
+    const confirmInstructionsButton = document.getElementById('confirm-instructions-button');
+    const demographicsModal = document.getElementById('demographics-modal');
+    const modalContinueButton = document.getElementById('modal-continue-button');
 
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Interaction Study</title>
-        <link rel="stylesheet" href="static/style.css">
-        <link rel="icon" href="data:;base64,iVBORw0KGgo=">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-     </head>
-<body>
-    <!-- Timer Display - Top Right -->
-    <div id="timer-display" style="position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; border-radius: 5px; font-family: monospace; font-size: 16px; z-index: 1000; display: none;">
-        Time: <span id="countdown-timer">20:00</span>
-    </div>
+    const finalInstructionsModal = document.getElementById('final-instructions-modal');
+    const finalInstructionsButton = document.getElementById('final-instructions-button');
 
-    <div class="container">
+    // State flags for the new parallel logic
+    let isBackendReady = false;
+    let isUserReady = false;
 
-        <!-- NEW: Consent Form Section -->
-        <div id="consent-phase" class="study-phase" style="display: none;">
-            <div id="consent-content">
-                 <h2 style="text-align: center;">Consent to Participate in Research</h2>
-                 <h3 style="text-align: center;">Title of Study: Interaction Study</h3>
+    const initialForm = document.getElementById('initial-form');
+    const initLoadingDiv = document.getElementById('init-loading');
 
-                 <h4>About this Study</h4>
-                 <p>You are being asked to participate in a research study. This form provides you with information about the study.</p>
- 
-                 <h4>Purpose of Research</h4>
-                 <p>This research examines how people make judgments during conversational interactions and how these judgments change over time.</p>
- 
-                 <h4>What You Will Be Asked to Do</h4>
-                 <p>If you agree to participate, you will:</p>
-                 <ul>
-                     <li>Engage in a text-based conversation with a conversational partner.</li>
-                     <li>After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI using a sliding scale (0 = definitely human, 1 = definitely AI).</li>
-                     <li>Optionally provide brief comments about your experience during the conversation.</li>
-                     <li>Complete a brief demographic questionnaire at the beginning.</li>
-                     <li>The total time commitment will be approximately 10 minutes.</li>
-                     <li>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</li>
-                 </ul>
- 
-                 <h4>Your Rights as a Participant</h4>
-                 <ul>
-                     <li>Your participation is voluntary.</li>
-                     <li>You may stop at any time.</li>
-                     <li>You may choose not to answer any question.</li>
-                     <li>You may not be told everything about the purpose of this research study initially, but you will be fully informed after completion.</li>
-                 </ul>
- 
-                 <h4>Risks and Benefits</h4>
-                 <ul>
-                     <li>There are no known risks associated with participating in this study beyond those encountered in normal daily conversation.</li>
-                     <li>While there are no direct benefits to you, your participation helps advance our understanding of human-AI interaction and judgment processes.</li>
-                 </ul>
+    const messageList = document.getElementById('message-list');
+    const userMessageInput = document.getElementById('user-message-input');
+    const sendMessageButton = document.getElementById('send-message-button');
+    const typingIndicator = document.getElementById('typing-indicator');
+    const chatInputContainer = document.getElementById('chat-input-container'); // Div containing text input and send button
 
-                 <h4>Compensation</h4>
-                 <ul>
-                    <li>You will receive compensation equivalent to $8.00 per hour for your participation through the online platform.</li>
-                 </ul>
- 
-                 <h4>Confidentiality</h4>
-                 <ul>
-                    <li>Your responses will be stored securely.</li>
-                    <li>Data will be analyzed without any identifying information.</li>
-                    <li>Only researchers will have access to the data.</li>
-                    <li>Anonymized results derived from your data may be shared in OpenScience frameworks for transparency of our research progress.</li>
-                    <li>Any personally identifying information you may share during conversations will be removed from analyses and will not be used in research outputs.</li>
-                    <li>Analyses (quantitative and qualitative) will be carried out on any text you write during the study.</li>
-                 </ul>
+    const confidenceSlider = document.getElementById('confidence-slider');
+    const confidenceValueSpan = document.getElementById('confidence-value');
+    const submitRatingButton = document.getElementById('submit-rating-button');
+    const ratingLoadingDiv = document.getElementById('rating-loading');
 
-                 <h4>Questions or Concerns?</h4>
-                 <ul>
-                    <li>For questions about the research: Contact the Principal Investigator at nvitali@fas.harvard.edu</li>
-                    <li>For questions about your rights as a participant: Contact cuhs@harvard.edu</li>
-                 </ul>
-                 
-                 <h4>Agreement to Participate</h4>
-                 <p>By clicking "I agree" below, you indicate that:</p>
-                 <ul>
-                    <li>You are at least 18 years old.</li>
-                    <li>You have read and understood this consent form.</li>
-                    <li>You voluntarily agree to participate.</li>
-                    <li>You understand you can withdraw at any time.</li>
-                 </ul>
-            </div>
+    const feelsOffCheckbox = document.getElementById('feels-off-checkbox');
+    const commentInputArea = document.getElementById('comment-input-area');
+    const feelsOffCommentTextarea = document.getElementById('feels-off-comment');
+    const submitCommentButton = document.getElementById('submit-comment-button');
+    const commentLoadingDiv = document.getElementById('comment-loading');
+
+    const finalDecisionText = document.getElementById('final-decision-text');
+    const finalDecisionTimeText = document.getElementById('final-decision-time-text');
+    const confidenceTrendData = document.getElementById('confidence-trend-data');
+    const newSessionButton = document.getElementById('new-session-button');
+    const loadResearcherDataButton = document.getElementById('load-researcher-data-button');
+    const researcherDataContent = document.getElementById('researcher-data-content');
+    const researcherDataSection = document.getElementById('researcher-data-section');
+
+    const consentPhaseDiv = document.getElementById('consent-phase');
+    const consentContentDiv = document.getElementById('consent-content');
+    const consentActionsDiv = document.getElementById('consent-actions');
+    const consentDownloadPromptDiv = document.getElementById('consent-download-prompt');
+    const agreeButton = document.getElementById('agree-button');
+    const disagreeButton = document.getElementById('disagree-button');
+    const downloadConsentButton = document.getElementById('download-consent-button');
+    const skipConsentDownloadButton = document.getElementById('skip-consent-download-button');
+    
+    // NEW: Debrief and Summary Phase Elements
+    const debriefPhaseDiv = document.getElementById('debrief-phase');
+    const summaryPhaseDiv = document.getElementById('summary-phase');
+    const downloadDebriefButton = document.getElementById('download-debrief-button');
+    const continueAfterDebriefButton = document.getElementById('continue-after-debrief-button');
+
+    const feedbackPhaseDiv = document.getElementById('feedback-phase');
+    const submitFeedbackButton = document.getElementById('submit-feedback-button');
+    const skipFeedbackButton = document.getElementById('skip-feedback-button');
+    const feedbackTextarea = document.getElementById('feedback-textarea');
+    const mainContainer = document.querySelector('.container'); // For the disagree message
+
+    // 1. Prolific Placeholder URLs
+    const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=CR0KFVQO";
+    const PROLIFIC_REJECTION_URL = "https://app.prolific.com/submissions/complete?cc=C120SCQ9";
+    const PROLIFIC_TIMED_OUT_URL = "https://app.prolific.com/submissions/complete?cc=C1B54A7Q";
+
+
+    // 2. Production Mode Check
+    const isProduction = (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+
+    // --- Railway API adapter (add right after `isProduction`) ---
+    
+    // DEBUG: Railway-only error logging function
+    async function logToRailway(errorInfo) {
+        try {
+            const debugPayload = {
+                error_type: errorInfo.type || 'Unknown',
+                error_message: errorInfo.message || 'No message',
+                session_id: sessionId || 'No session',
+                current_turn: currentTurn || 'No turn',
+                timestamp: new Date().toISOString(),
+                stack_trace: errorInfo.stack || 'No stack trace',
+                additional_context: errorInfo.context || {}
+            };
             
-            <div id="consent-actions">
-                 <button id="agree-button">I agree to participate</button>
-                 <button id="disagree-button" style="background-color: #dc3545;">I do not agree</button>
-            </div>
- 
-            <div id="consent-download-prompt" style="display: none; text-align: center; margin-top: 30px;">
-                 <p>Thank you for agreeing to participate. Would you like to download a copy of the consent form for your records?</p>
-                 <button id="download-consent-button">Download Consent Form</button>
-                 <button id="skip-consent-download-button">Continue Without Downloading</button>
-            </div>
-        </div>
+            await fetch(`${API_BASE_URL}/debug_log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(debugPayload)
+            });
+            // Silently fail - no logs or notifications to avoid participant contamination
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+        }
+    }
+    
+    const API_BASE_URL = isProduction ? 'https://ai-turing-test-production.up.railway.app' : '';
+
+    // Monkey-patch fetch so relative paths (starting with "/") hit Railway in production.
+    // Local dev (localhost/127.0.0.1) stays unchanged.
+    (() => {
+    const RAW_FETCH = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+        try {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.startsWith('/')) {
+            return RAW_FETCH(`${API_BASE_URL}${url}`, init);
+        }
+        return RAW_FETCH(input, init);
+        } catch {
+        return RAW_FETCH(input, init);
+        }
+    };
+    })();
+
+    
+
+    // --- LIKERT BUBBLE HANDLERS FOR INITIAL FORM ---
+    const likertBubbles = document.querySelectorAll('.likert-bubble');
+    likertBubbles.forEach(bubble => {
+        bubble.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent form submission
+            
+            const groupName = bubble.dataset.name;
+            const value = bubble.dataset.value;
+            
+            // Remove selected class from all bubbles in this group
+            document.querySelectorAll(`.likert-bubble[data-name="${groupName}"]`).forEach(b => {
+                b.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked bubble
+            bubble.classList.add('selected');
+            
+            // Update the hidden input
+            document.querySelector(`input[type="hidden"][name="${groupName}"]`).value = value;
+        });
+    });
+    // --- END LIKERT BUBBLE HANDLERS ---
+
+    // We generate a client-side ID for the consent form filename before the server gives us a session ID.
+    const participantId = self.crypto.randomUUID();
+    // Try to compute prolificPid from URL parameters if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const prolificPid = urlParams.get('PROLIFIC_PID') || urlParams.get('prolific_pid') || urlParams.get('prolificPID') || null;
+
+    let sessionId = null; // Changed from localStorage.getItem('sessionId') to ensure clean start
+    let currentTurn = 0;
+    let aiResponseTimestamp = null;
+    let progressInterval; // Moved from inside the form listener
+    let lastConfidenceValue = 50; // NEW: Changed to 50 (0-100 scale, default 50%)
+    let finalSummaryData = null; // NEW: To store summary data before showing feedback form
+
+    // NEW: Binary choice tracking variables
+    let binaryChoiceStartTime = null; // When AI message appears
+    let binaryChoice = null; // 'human' or 'ai'
+    let binaryChoiceTime = null; // Time taken to make binary choice
+    let buttonOrderRandomized = false; // For counterbalancing (currently disabled)
+
+    // NEW: Enhanced reaction time tracking variables
+    let confidenceStartTime = null; // When they first touch the slider (after binary choice)
+    let sliderInteractionLog = []; // Log of all slider interactions
+    
+    // NEW: Fallback storage for failed network delay updates
+    let pendingNetworkDelayUpdates = []; // Store failed updates for later retry
+    
+    // Timer variables
+    let studyTimer = null;
+    let studyStartTime = null;
+    let timeExpired = false;
+    const STUDY_DURATION_MS = 7.5 * 60 * 1000; // 7.5 minutes in milliseconds
+
+    // NEW: Tab visibility tracking
+    let tabHiddenStartTime = null;
+    let cumulativeTabHiddenMs = 0;
+
+    // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
+    const allSliders = document.querySelectorAll('#initial-form input[type="range"]');
+    allSliders.forEach(slider => {
+        const valueSpan = slider.nextElementSibling;
+        if (valueSpan && valueSpan.classList.contains('slider-value')) {
+            // Set initial value on page load
+            valueSpan.textContent = slider.value;
+
+            // Add listener to update value in real-time
+            slider.addEventListener('input', () => {
+                valueSpan.textContent = slider.value;
+            });
+        }
+    });
+    // --- END NEW SLIDER LOGIC ---
+
+    // --- Helper Functions ---
+    // Normalize server timestamps that might be seconds or milliseconds.
+    function tsToMs(ts) {
+        if (ts == null) return null;
+        const n = Number(ts);
+        // If it's already in ms (>= ~2001-09), return as-is, else convert seconds -> ms
+        return n >= 1e12 ? n : n * 1000;
+    }
+
+    function showError(message) {
+        errorMessageArea.textContent = message;
+        errorMessageArea.style.display = 'block';
+        setTimeout(() => {
+            errorMessageArea.style.display = 'none';
+        }, 5000);
+    }
+
+    // Helper: extract a readable error message from API JSON result
+    function getApiErrorMessage(result, fallback) {
+        try {
+            if (!result) return fallback || 'An unexpected error occurred.';
+            const detail = result.detail;
+            if (!detail) return fallback || 'An unexpected error occurred.';
+            if (Array.isArray(detail)) {
+                const msgs = detail.map(d => {
+                    if (!d) return '';
+                    const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : null;
+                    const msg = d.msg || d.message || (typeof d === 'string' ? d : JSON.stringify(d));
+                    return field ? `${field}: ${msg}` : msg;
+                });
+                return msgs.join(' ');
+            }
+            if (typeof detail === 'object') {
+                const field = Array.isArray(detail.loc) ? detail.loc[detail.loc.length - 1] : null;
+                const msg = detail.msg || detail.message || JSON.stringify(detail);
+                return field ? `${field}: ${msg}` : msg;
+            }
+            return String(detail);
+        } catch (e) {
+            return fallback || 'An unexpected error occurred.';
+        }
+    }
+
+    // Lock/unlock all controls inside the initial demographics form
+    function setInitialFormControlsDisabled(disabled) {
+        if (!initialForm) return;
+        const controls = initialForm.querySelectorAll('input, select, textarea, button');
+        controls.forEach(el => {
+            if (el.tagName === 'INPUT' && el.type === 'hidden') {
+                return; // keep hidden inputs enabled so values submit in FormData
+            }
+            el.disabled = disabled;
+        });
+    }
+
+    // NEW: UI event logger
+    async function logUiEvent(event, metadata = {}) {
+        try {
+            await fetch('/log_ui_event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event,
+                    ts_client: Date.now() / 1000,
+                    metadata,
+                    participant_id: participantId,
+                    prolific_pid: prolificPid,
+                    session_id: sessionId
+                })
+            });
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+        }
+    }
+
+    // NEW: finalize without session (e.g., consent declined)
+    async function finalizeNoSession(reason) {
+        try {
+            await fetch('/finalize_no_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    participant_id: participantId,
+                    prolific_pid: prolificPid,
+                    reason
+                })
+            });
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+        }
+    }
+
+    // NEW: log when conversation actually starts (timer begins)
+    async function logConversationStart() {
+        try {
+            await fetch('/log_conversation_start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId
+                })
+            });
+            
+            logToRailway({
+                type: 'CONVERSATION_START',
+                message: 'Conversation timer started - actual chat beginning',
+                context: { session_id: sessionId }
+            });
+        } catch (e) {
+            // Silently fail - cannot risk any participant-visible errors
+            logToRailway({
+                type: 'CONVERSATION_START_ERROR',
+                message: 'Failed to log conversation start',
+                context: { error: e.message }
+            });
+        }
+    }
+
+    
+
+    // Update timer message based on current study state (called when time expired and state changes)
+    function updateTimerMessage() {
+        if (!timeExpired) return;
+        
+        const timerDisplay = document.getElementById('timer-display');
+        let timeExpiredMessage;
+        
+        if (assessmentAreaDiv.style.display === 'block') {
+            // State 3: Rating phase - user needs to submit confidence rating
+            timeExpiredMessage = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
+        } else if (typingIndicator.style.display === 'flex') {
+            // State 2: Waiting for AI response
+            timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
+        } else {
+            // State 1: Before sending message
+            timeExpiredMessage = 'Time limit reached! Please send your message to receive your last response to judge.';
+        }
+        
+        timerDisplay.innerHTML = timeExpiredMessage;
+    }
+
+    // Start the 20-minute countdown timer
+    function startStudyTimer() {
+        studyStartTime = Date.now();
+        const timerDisplay = document.getElementById('timer-display');
+        const countdownTimer = document.getElementById('countdown-timer');
+        
+        // Show the timer
+        timerDisplay.style.display = 'block';
+        
+        studyTimer = setInterval(() => {
+            const elapsed = Date.now() - studyStartTime;
+            const remaining = Math.max(0, STUDY_DURATION_MS - elapsed);
+            
+            // Format time as MM:SS
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            const timeText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            countdownTimer.textContent = timeText;
+            
+            // Change color when time is running out
+            if (remaining <= 60000) { // Last minute - red
+                timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
+            } else if (remaining <= 180000) { // Last 3 minutes - orange
+                timerDisplay.style.background = 'rgba(255, 193, 7, 0.9)';
+            }
+            
+            // Time expired
+            if (remaining === 0) {
+                clearInterval(studyTimer);
+                timeExpired = true;
+                timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
+                timerDisplay.style.fontSize = '14px';
+                timerDisplay.style.width = '300px';
+                
+                // Set initial timer message and show message if in rating phase
+                updateTimerMessage();
+                if (assessmentAreaDiv.style.display === 'block') {
+                    // NEW: Updated message for binary choice system
+                    showError('Time expired! Please complete your final rating (binary choice + confidence) to finish the study.');
+                }
+            }
+        }, 1000);
+    }
+
+    // This function checks if both user and backend are ready, then proceeds
+    function tryProceedToChat() {
+        if (isBackendReady && isUserReady) {
+            // Stop and hide the loading animation at the last possible moment
+            clearInterval(progressInterval);
+            initLoadingDiv.style.display = 'none';
+
+            // Ensure the instruction pop-up is hidden
+            finalInstructionsModal.style.display = 'none';
+            
+            // Switch to the main chat page view
+            showMainPhase('chat_and_assessment_flow');
+
+            // It fully prepares the chat interface for use.
+            assessmentAreaDiv.style.display = 'none';
+            chatInputContainer.style.display = 'flex';
+            userMessageInput.disabled = false;
+            sendMessageButton.disabled = false;
+            userMessageInput.focus();
+            
+            // START THE 7.5-MINUTE TIMER AND LOG CONVERSATION START
+            startStudyTimer();
+            
+            // Log when conversation actually begins
+            logConversationStart();
+        }
+    }
+
+    function showMainPhase(phase) {
+        // Hide all phases first
+        consentPhaseDiv.style.display = 'none';
+        instructionsPhaseDiv.style.display = 'none';
+        initialSetupDiv.style.display = 'none';
+        chatInterfaceDiv.style.display = 'none';
+        finalPageDiv.style.display = 'none';
+        feedbackPhaseDiv.style.display = 'none'; // ADD THIS LINE
 
 
-        <div id="instructions-phase" class="study-phase" style="display: none;">
-            <h2>Welcome to the Interaction Study</h2>
-            <p>
-                In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human. If your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible.</strong>
-            <p>
-                Please assume AI means Large Language Model (LLM), such as ChatGPT.
-            <p>
-            <p>
-                On the next page you will complete a brief form and then randomly assigned to either send the first message or receive the first message.
-                After that you will be shown a conversation box where you can chat back and forth with your partner.
-                Your conversation partner knows they're being evaluated and is trying to appear as human-like as possible. You can talk about anything you would like to make your decision.
-            <p>
-                <strong><em>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</em></strong>
-            </p>
-            <p>
-                <strong>After each message, you'll answer two questions:</strong>
-            </p>
-            <ol>
-                <li><strong>Right now, what's your best guess?</strong> (Human / AI)
-                    <ul>
-                        <li>This isn't a final answer, just where you're leaning at this moment.</li>
-                        <li><em>Make sure you're ready before selecting - once you click, it moves on to the next question.</em></li>
-                    </ul>
-                </li>
-                <li><strong>How confident are you in that guess?</strong> (0-100%)
-                    <ul>
-                        <li>0% = completely uncertain</li>
-                        <li>50% = basically guessing</li>
-                        <li>100% = completely certain</li>
-                    </ul>
-                </li>
-            </ol>
-            <p>
-                <strong><em>Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human. Then, evaluate each message sent by your conversation partner as evidence towards your judgment for that turn.</em></strong>
-            </p>
-            <p>
-                You can change your mind as many times as you want across turns. We're interested in how your impression evolves.
-            </p>
-            <button id="confirm-instructions-button">I Understand, Continue</button>
-        </div>
+        if (phase === 'consent') consentPhaseDiv.style.display = 'block';
+        else if (phase === 'instructions') instructionsPhaseDiv.style.display = 'block'; // THIS LINE IS ADDED
+        else if (phase === 'initial') initialSetupDiv.style.display = 'block';
+        else if (phase === 'chat_and_assessment_flow') chatInterfaceDiv.style.display = 'block';
+        else if (phase === 'feedback') feedbackPhaseDiv.style.display = 'block'; // ADD THIS LINE
+        else if (phase === 'final') finalPageDiv.style.display = 'block';
+    }
 
-    <div id="initial-setup" class="study-phase">
 
-            <form id="initial-form">
-                <!-- AI Experience Section -->
-                <label>How often do you use AI chatbots (ChatGPT, Claude, Gemini, etc.)?</label>
-                <select name="ai_usage_frequency" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="0">Never</option>
-                    <option value="1">A few times ever</option>
-                    <option value="2">Monthly</option>
-                    <option value="3">Weekly</option>
-                    <option value="4">Daily</option>
-                    <option value="5">Multiple times daily</option>
-                </select>
 
-                <label>Which AI models have you used? (check all that apply)</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" name="ai_models_used" value="chatgpt"> ChatGPT</label>
-                    <label><input type="checkbox" name="ai_models_used" value="claude"> Claude</label>
-                    <label><input type="checkbox" name="ai_models_used" value="gemini"> Gemini</label>
-                    <label><input type="checkbox" name="ai_models_used" value="perplexity"> Perplexity</label>
-                    <label><input type="checkbox" name="ai_models_used" value="grok"> Grok</label>
-                    <label><input type="checkbox" name="ai_models_used" value="other"> Other</label>
-                </div>
+    function scrollToBottom() {
+        const chatWindow = document.querySelector('.chat-window');
+        // We use the setTimeout trick to make sure the browser has rendered the new content
+        setTimeout(() => {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }, 0);
+    }
 
-                <label>If you received a text from a number you didn't know, how quickly do you think you'd be able to tell if it was an AI or human?</label>
-                <div class="likert-bubble-group">
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="1">Immediately (1-2 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="2">Very quickly (3-5 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="3">Fairly quickly (6-10 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="4">After some convo (11-20 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="5">After extended convo (20+ msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="self_detection_speed" data-value="6">Couldn't tell</button>
-                </div>
-                <input type="hidden" name="self_detection_speed" value="">
+    function addMessageToUI(text, sender) {
+        const messageBubble = document.createElement('div');
+        messageBubble.classList.add('message-bubble', sender);
+        messageBubble.textContent = text;
+        messageList.appendChild(messageBubble);
 
-                <label>If the average person received a text message from an unknown number, how quickly do you think they'd be able to tell if it was sent by an AI or a human?</label>
-                <div class="likert-bubble-group">
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="1">Immediately (1-2 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="2">Very quickly (3-5 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="3">Fairly quickly (6-10 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="4">After some convo (11-20 msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="5">After extended convo (20+ msgs)</button>
-                    <button type="button" class="likert-bubble" data-name="others_detection_speed" data-value="6">Couldn't tell</button>
-                </div>
-                <input type="hidden" name="others_detection_speed" value="">
+        // FIX: Wait for the browser to render the new message before scrolling.
+        // This ensures scrollHeight has the correct, updated value.
+        scrollToBottom();
 
-                <label>How would you rate the current capabilities of AI chatbots?</label>
-                <div class="likert-bubble-group">
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="1">Not at all Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="2">Slightly Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="3">Somewhat Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="4">Moderately Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="5">Quite Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="6">Very Capable</button>
-                    <button type="button" class="likert-bubble" data-name="ai_capabilities_rating" data-value="7">Extremely Capable</button>
-                </div>
-                <input type="hidden" name="ai_capabilities_rating" value="">
+        // Log to Railway only
+        logToRailway({
+            type: 'UI_DEBUG',
+            message: `Added message from ${sender}. messageList.childElementCount: ${messageList.childElementCount}`,
+            context: {
+                function: 'addMessageToUI',
+                sender: sender,
+                message_count: messageList.childElementCount
+            }
+        });
+    }
 
-                <label>How much do you generally trust AI systems?</label>
-                <div class="likert-bubble-group">
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="1">Not at all Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="2">Slightly Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="3">Somewhat Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="4">Moderately Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="5">Quite Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="6">Very Trusting</button>
-                    <button type="button" class="likert-bubble" data-name="trust_in_ai" data-value="7">Extremely Trusting</button>
-                </div>
-                <input type="hidden" name="trust_in_ai" value="">
+    function generateAndDownloadPdf(content, filename) {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // --- NEW: Page Layout Logic ---
+            const leftMargin = 15;
+            const topMargin = 20;
+            const bottomMargin = 20;
+            const lineHeight = 7; // Adjust this value to increase/decrease line spacing
+            let y = topMargin; // This will be our vertical cursor
 
-                <!-- Demographics -->
-                <label>Age:</label>
-                <input type="number" name="age" min="18" max="100" required>
+            // Get the dimensions of the page
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const usableWidth = pageWidth - (leftMargin * 2);
 
-                <label>Gender:</label>
-                <select name="gender" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="non_binary">Non-binary</option>
-                    <option value="prefer_not_say">Prefer not to say</option>
-                    <option value="other">Other</option>
-                </select>
+            doc.setFontSize(12);
 
-                <label>Highest level of education completed:</label>
-                <select name="education" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="less_than_high_school">Less than high school</option>
-                    <option value="high_school">High school diploma/GED</option>
-                    <option value="some_college">Some college</option>
-                    <option value="associates">Associate's degree</option>
-                    <option value="bachelors">Bachelor's degree</option>
-                    <option value="masters">Master's degree</option>
-                    <option value="doctorate">Doctoral/Professional degree</option>
-                </select>
+            // Split the text into lines that fit the page width
+            const lines = doc.splitTextToSize(content, usableWidth);
+            
+            // Loop through each line of text
+            lines.forEach(line => {
+                // Check if adding the next line would go off the page
+                if (y + lineHeight > pageHeight - bottomMargin) {
+                    doc.addPage();      // If so, add a new page
+                    y = topMargin;      // and reset our vertical cursor to the top
+                }
+                
+                // Add the line of text to the page
+                doc.text(line, leftMargin, y);
+                
+                // Move the vertical cursor down for the next line
+                y += lineHeight;
+            });
+            // --- END: New Logic ---
 
-                <label>Ethnicity (check all that apply):</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" name="ethnicity" value="white"> White/Caucasian</label>
-                    <label><input type="checkbox" name="ethnicity" value="black"> Black/African American</label>
-                    <label><input type="checkbox" name="ethnicity" value="hispanic"> Hispanic/Latino</label>
-                    <label><input type="checkbox" name="ethnicity" value="asian"> Asian</label>
-                    <label><input type="checkbox" name="ethnicity" value="native_american"> Native American/Alaska Native</label>
-                    <label><input type="checkbox" name="ethnicity" value="pacific_islander"> Native Hawaiian/Pacific Islander</label>
-                    <label><input type="checkbox" name="ethnicity" value="middle_eastern"> Middle Eastern/North African</label>
-                    <label><input type="checkbox" name="ethnicity" value="other"> Other</label>
-                    <label><input type="checkbox" name="ethnicity" value="prefer_not_say"> Prefer not to say</label>
-                </div>
+            doc.save(filename);
+            // Log to Railway only
+            logToRailway({
+                type: 'PDF_DOWNLOAD',
+                message: `PDF "${filename}" download initiated`,
+                context: { filename: filename }
+            });
 
-                <label>Annual household income:</label>
-                <select name="income" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="under_25k">Under $25,000</option>
-                    <option value="25k_50k">$25,000 - $49,999</option>
-                    <option value="50k_75k">$50,000 - $74,999</option>
-                    <option value="75k_100k">$75,000 - $99,999</option>
-                    <option value="100k_150k">$100,000 - $149,999</option>
-                    <option value="150k_plus">$150,000 or more</option>
-                    <option value="prefer_not_say">Prefer not to say</option>
-                </select>
+        } catch (error) {
+            // Log to Railway only
+            logToRailway({
+                type: 'PDF_GENERATION_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: { filename: filename }
+            });
+            showError('There was a problem generating the PDF download. Please contact the researcher.');
+        }
+    }
 
-                <label>Political affiliation:</label>
-                <select name="political_affiliation" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="very_progressive">Very Progressive/Far Left</option>
-                    <option value="progressive">Progressive</option>
-                    <option value="liberal">Liberal</option>
-                    <option value="moderate_liberal">Moderate Liberal</option>
-                    <option value="moderate">Moderate/Centrist</option>
-                    <option value="moderate_conservative">Moderate Conservative</option>
-                    <option value="conservative">Conservative</option>
-                    <option value="very_conservative">Very Conservative/Far Right</option>
-                    <option value="libertarian">Libertarian</option>
-                    <option value="independent">Independent/No Affiliation</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_say">Prefer not to say</option>
-                </select>
+    // --- NEW: Consent Logic ---
+    agreeButton.addEventListener('click', () => {
+        logUiEvent('consent_agree_clicked');
+        // When user agrees, hide the main text and buttons, and show the download prompt.
+        consentContentDiv.style.display = 'none';
+        consentActionsDiv.style.display = 'none';
+        consentDownloadPromptDiv.style.display = 'block';
+    });
 
-                <label>Social media platforms you use (check all that apply):</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" name="social_media" value="x_twitter"> X (Twitter)</label>
-                    <label><input type="checkbox" name="social_media" value="facebook"> Facebook</label>
-                    <label><input type="checkbox" name="social_media" value="instagram"> Instagram</label>
-                    <label><input type="checkbox" name="social_media" value="tiktok"> TikTok</label>
-                    <label><input type="checkbox" name="social_media" value="reddit"> Reddit</label>
-                    <label><input type="checkbox" name="social_media" value="youtube"> YouTube</label>
-                    <label><input type="checkbox" name="social_media" value="linkedin"> LinkedIn</label>
-                    <label><input type="checkbox" name="social_media" value="snapchat"> Snapchat</label>
-                    <label><input type="checkbox" name="social_media" value="threads"> Threads</label>
-                    <label><input type="checkbox" name="social_media" value="bluesky"> Bluesky</label>
-                    <label><input type="checkbox" name="social_media" value="none"> None</label>
-                    <label><input type="checkbox" name="social_media" value="other"> Other</label>
-                </div>
+    disagreeButton.addEventListener('click', async () => {
+        logUiEvent('consent_disagree_clicked');
+        await finalizeNoSession('consent_disagreed');
 
-                <label>Hours of internet use per week:</label>
-                <select name="internet_usage_per_week" required>
-                    <option value="" disabled selected>Select...</option>
-                    <option value="1">Less than 1 hour</option>
-                    <option value="2">1-5 hours</option>
-                    <option value="3">6-10 hours</option>
-                    <option value="4">11-20 hours</option>
-                    <option value="5">21-40 hours</option>
-                    <option value="6">More than 40 hours</option>
-                </select>
+        // --- MODIFICATION START ---
+        if (isProduction) {
+            window.location.href = PROLIFIC_REJECTION_URL;
+        } else {
+            // Keep the original behavior for local testing
+            mainContainer.innerHTML = `
+                <h2>Study Ended (DEV MODE)</h2>
+                <p>You must consent to participate. In production, you would be redirected to Prolific.</p>
+            `;
+        }
+    });
 
-                <button type="submit">Begin Conversation</button>
-            </form>
-            <div id="init-loading" class="loading-message" style="display: none;">
-                <div id="progress-bar-container">
-                    <div id="progress-bar"></div>
-                </div>
-                <span>Finding and connecting with a partner please wait... This might take a moment.</span>
-            </div>
-        </div>
+    skipConsentDownloadButton.addEventListener('click', () => {
+        logUiEvent('consent_skip_download_clicked');
+        // If they skip download, just move to the next phase.
+        showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
 
-       <!-- Chat Interface is now the main container for conversation and assessment -->
-       <div id="chat-interface" class="study-phase" style="display: none;">
-           <h3>Conversation</h3>
-           <div class="chat-window">
-               <div id="message-list">
-                   <!-- Messages will be appended here -->
-               </div>
-               <div id="typing-indicator" style="display: none;">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
-           </div>
+    });
 
-           <!-- Assessment Area is NOW INSIDE chat-interface -->
-           <!-- It will be shown/hidden as needed -->
-           <div id="assessment-area" style="display: none; margin-top:15px; padding-top:15px; border-top: 1px solid #eee;">
-            <h4>Your Assessment</h4>
+    downloadConsentButton.addEventListener('click', () => {
+        logUiEvent('consent_download_clicked');
+        const timestamp = new Date().toLocaleString();
 
-            <!-- Step 1: Binary Choice (Human/AI) -->
-            <div id="binary-choice-section">
-                <p><strong>What's your best guess right now?</strong></p>
-                <div id="binary-choice-buttons" style="display: flex; gap: 20px; justify-content: center; margin: 20px 0;">
-                    <button id="choice-human-button" class="binary-choice-btn">Human</button>
-                    <button id="choice-ai-button" class="binary-choice-btn">AI</button>
-                </div>
-            </div>
 
-            <!-- Step 2: Confidence Slider (0-100%) -->
-            <div id="confidence-section" style="display: none;">
-                <p><strong>How confident are you in your guess of "<span id="chosen-label"></span>"?</strong></p>
-                <label for="confidence-slider">Confidence: <span id="confidence-value">50</span>%</label>
-                <input type="range" id="confidence-slider" min="0" max="100" step="1" value="50">
-                <div class="slider-labels">
-                    <span class="label-left">0% (Completely Uncertain)</span>
-                    <span class="label-center">50% (Guessing)</span>
-                    <span class="label-right">100% (Completely Certain)</span>
-                </div>
-                <button id="submit-rating-button">Submit Rating</button>
-                <div id="rating-loading" class="loading-message" style="display: none;">Submitting rating...</div>
-            </div>
+        // If they want to download, generate the PDF and then move to the next phase.
+        const consentText = `
+CONSENT TO PARTICIPATE IN RESEARCH
+Title of Study: Interaction Study
+Participant ID: ${participantId}
+Prolific ID: ${prolificPid || 'N/A'}
 
-            <div id="comment-section" style="display: none; margin-top: 20px;">
-                <label for="feels-off-checkbox">Include a comment about this turn?</label>
-                <input type="checkbox" id="feels-off-checkbox">
-                <div id="comment-input-area" style="display: none;">
-                    <textarea id="feels-off-comment" placeholder="Your comment..."></textarea>
-                    <button id="submit-comment-button">Submit Comment</button>
-                    <div id="comment-loading" class="loading-message" style="display: none;">Submitting comment...</div>
-                </div>
-            </div>
-        </div>
+[CONSENT RECORDED: Participant agreed to participate on ${timestamp}]
 
-        <!-- Chat Input Area will be hidden when assessment is active -->
-        <div id="chat-input-container" class="chat-input-area">
-            <input type="text" id="user-message-input" placeholder="Type your message here...">
-            <button id="send-message-button">Send</button>
-        </div>
-    </div>
-    <div id="feedback-phase" class="study-phase" style="display: none;">
-        <h2>Share Your Experience</h2>
-        <p>Before we conclude, we would appreciate any feedback you have about the conversation. Please share anything you noticed. This is optional and will not affect your compensation.</p>
-        <textarea id="feedback-textarea" placeholder="Your thoughts..." rows="6" style="width: 100%; box-sizing: border-box;"></textarea>
-        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 20px;">
-            <button id="submit-feedback-button">Submit Feedback</button>
-            <button id="skip-feedback-button" style="background-color: #6c757d;">Skip</button>
-        </div>
-    </div>
-       <div id="final-page" class="study-phase" style="display: none;">
-           <div id="debrief-phase">
-               <div id="debrief-section" style="text-align: left;">
-                   <h2 style="text-align: center">Study Debrief Form</h2>
-                   <p>Now that you have completed the study, we would like to explain its purpose in more detail.</p>
-                   <h3>Purpose of the Research</h3>
-                   <p>This study examines "psychological tactics" in human-AI interaction. We are investigating whether an AI can appear more human-like by using specific conversational strategies, such as mimicking user behavior, using humor, or expressing mild opinions.</p>
-                   <h3>Why We Did Not Tell You Everything Initially</h3>
-                   <p>To get a natural assessment of your interaction, we could not tell you beforehand that the AI might be using specific tactics. Knowing this could have biased your judgments and conversation style. You were correctly told your task was to determine if you were talking to an AI or a human.</p>
-                   <h3>The Complete Picture</h3>
-                   <p>You were randomly assigned to interact with an AI using one of two personas: a "control" persona with neutral responses, or an "experimental" persona that actively used psychological tactics based on your initial survey answers and the flow of the conversation. By comparing confidence ratings and final decisions between these groups, we can understand which strategies, if any, make an AI more convincing.</p>
-                   <h3>Use of Your Data</h3>
-                   <p>If you are comfortable with us using your anonymized responses now that you know the full purpose of the study, you don't need to do anything. If you would prefer that we not use your responses, please contact the research team and we will delete your data.</p>
-               </div>
-               <div id="debrief-actions" style="text-align: center; margin-top: 20px;">
-                   <button id="download-debrief-button">Download Debrief Form</button>
-                   <button id="continue-after-debrief-button">Continue</button>
-               </div>
-           </div>
+About this Study
+You are being asked to participate in a research study. This form provides you with information about the study.
 
-           <div id="summary-phase" style="display: none;">
-               <h2>Thank you for participating!</h2>
-               <p id="final-decision-text"></p>
-               <p id="final-decision-time-text"></p>
-               <div id="confidence-trend-chart">
-                   <h4>Confidence Trend (0=Human, 1=AI)</h4>
-                   <pre id="confidence-trend-data"></pre>
-               </div>
-               <button id="new-session-button">Start New Session</button>
-               <div id="researcher-data-section" style="display: none; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
-                   <h3>Researcher Data (Debug View)</h3>
-                   <button id="load-researcher-data-button">Load Full Researcher Data</button>
-                   <pre id="researcher-data-content" style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; background-color: #f0f0f0; padding:10px;"></pre>
-               </div>
-           </div>
-       </div>
-        <div id="error-message-area" class="error-message" style="display:none;"></div>
-   </div>
+Purpose of Research
+This research examines how people make judgments during conversational interactions and how these judgments change over time.
 
-   <div id="demographics-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <p>Before we begin you will fill out a demographics questionnaire to better understand your experiences with AI, as well as basic information about you.</p>
-            <button id="modal-continue-button">I Understand, Continue</button>
-        </div>
-    </div>
+What You Will Be Asked to Do
+If you agree to participate, you will:
+- Engage in a text-based conversation with a conversational partner.
+- After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI using a sliding scale (0 = definitely human, 1 = definitely AI).
+- Optionally provide brief comments about your experience during the conversation.
+- Complete a brief demographic questionnaire at the beginning.
+- The total time commitment will be approximately 10 minutes.
+- You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.
 
-    <div id="final-instructions-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <p>In a moment you will see a conversation box. Your job is to decide if your conversational partner is a human, or an AI.</p>
-            <p><em>Remember, if your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible. Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human.
-                You should consider each message sent by your conversation partner as evidence towards your judgment for that turn. You are free to chat as you would like.</em></p>
+Your Rights as a Participant
+- Your participation is voluntary.
+- You may stop at any time.
+- You may choose not to answer any question.
+- You may not be told everything about the purpose of this research study initially, but you will be fully informed after completion.
 
-            <p class="emphasis-line"><strong>You have been randomly selected to send the first message.</strong></p>
+Risks and Benefits
+- There are no known risks associated with participating in this study beyond those encountered in normal daily conversation.
+- While there are no direct benefits to you, your participation helps advance our understanding of human-AI interaction and judgment processes.
 
-            <p><strong>After each message from your partner, you'll answer two questions:</strong></p>
-            <ol>
-                <li><strong>What's your best guess right now?</strong> Click either "Human" or "AI"
-                    <ul>
-                        <li><em>Be ready before clicking - once you select, it immediately moves to the next question.</em></li>
-                    </ul>
-                </li>
-                <li><strong>How confident are you?</strong> Use the slider (0-100%)
-                    <ul>
-                        <li>0% = completely uncertain, 50% = guessing, 100% = completely certain</li>
-                    </ul>
-                </li>
-            </ol>
+Compensation
+- You will receive compensation equivalent to $8.00 per hour for your participation through the online platform.
 
-            <p>You will chat with your partner for 7 minutes and 30 seconds. At the 7 minute 30 second mark you will make a final determination.</p>
-            <p>Response delays due to the strength of connection between you and your partner may occur when messages are sent and received, but the total chat time will be 7 minutes and 30 seconds.</p>
-            <button id="final-instructions-button">I understand</button>
-        </div>
-    </div>
+Confidentiality
+- Your responses will be stored securely.
+- Data will be analyzed without any identifying information.
+- Only researchers will have access to the data.
+- Anonymized results derived from your data may be shared in OpenScience frameworks for transparency of our research progress.
+- Any personally identifying information you may share during conversations will be removed from analyses and will not be used in research outputs.
+- Analyses (quantitative and qualitative) will be carried out on any text you write during the study.
 
-   <script src="static/script.js"></script>
-</body>
-</html>
+Questions or Concerns?
+- For questions about the research: Contact the Principal Investigator at nvitali@fas.harvard.edu
+- For questions about your rights as a participant: Contact cuhs@harvard.edu
 
+Agreement to Participate
+By clicking "I agree" below, you indicate that:
+- You are at least 18 years old.
+- You have read and understood this consent form.
+- You voluntarily agree to participate.
+- You understand you can withdraw at any time.
+
+[PARTICIPANT ACCEPTED THE ABOVE TERMS ON ${new Date().toLocaleString()}]
+        `;
+        
+        generateAndDownloadPdf(consentText, `Consent_Form_${participantId}.pdf`);
+        
+        // Move to the next phase after starting the download.
+        showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
+
+    });
+
+    // --- Prolific Dropout and Completion Logic ---
+    let handleEarlyExit = null; // Declare the variable first
+    
+    if (isProduction) {
+        // 1. DEFINE the function that will handle premature exits
+        handleEarlyExit = (event) => {
+            // This redirects the user to Prolific if they refresh or close the tab mid-study.
+            window.location.href = PROLIFIC_TIMED_OUT_URL;
+        };
+    }
+
+    // 1. First, we define the function that shows the summary page.
+    // It MUST come before the buttons that use it.
+    function showSummaryPhase() {
+        debriefPhaseDiv.style.display = 'none';
+        summaryPhaseDiv.style.display = 'block';
+    }
+
+    // 2. Now, we create the event listener for the debrief download button.
+    downloadDebriefButton.addEventListener('click', () => {
+        const debriefText = `
+STUDY DEBRIEF FORM
+Date: ${new Date().toLocaleString()}
+Participant ID: ${participantId}
+Prolific ID: ${prolificPid || 'N/A'}
+Session ID: ${sessionId || 'N/A'}
+
+Study Debrief Form
+
+Thank you for participating in our research study. Now that you have completed the study, we would like to explain its purpose in more detail.
+
+Purpose of the Research
+This study examines how people detect AI-generated communication and the cognitive processes underlying these judgments. We are specifically interested in understanding whether individuals possess implicit detection abilities, such as gut feelings, for identifying AI, even when they cannot explicitly articulate their suspicions. We also are investigating which specific conversational tactics most effectively lead humans to believe they are interacting with another human rather than AI.
+
+Why We Did Not Tell You Everything Initially
+When participants know exactly what researchers are studying, it can sometimes influence their responses and make them hyper-aware of potential AI "tells" or tactics. To get natural responses about your evolving confidence during the conversation, we did not tell you specifically that we were studying particular humanization tactics or measuring implicit detection processes. You were told the study involved determining whether you were talking to a human or AI, which was true, but we did not disclose our specific interest in how particular conversational strategies influence your moment-to-moment judgments.
+
+The Complete Picture
+In this study, you engaged in a conversation while providing continuous confidence ratings about whether you believed you were interacting with a human or AI. What you may not have realized is that:
+
+1) You were always interacting with an AI system. Specifically, a large language model designed to appear human-like in conversation.
+
+2) The AI used specific tactics. Based on your initial demographic responses, our system selected from various humanization tactics such as mirroring your language style, sharing personal anecdotes, expressing opinions, using humor, or subtly varying its typing style. These tactics were logged throughout your conversation.
+
+3) Your continuous confidence ratings and the time you took to make each rating allow us to model how evidence accumulated in your mind toward an "AI" or "human" decision. This helps us understand the cognitive processes behind AI detection.
+
+Our hypothesis is that people possess subtle, implicit abilities to detect AI-generated communication that may not always rise to conscious awareness. We also predict that certain conversational tactics (like personal anecdotes or opinion expression) will be more effective at convincing humans they are talking to another person. By analyzing your moment-to-moment confidence changes alongside the specific tactics the AI used, we can better understand which strategies most effectively influence human judgment of AI authenticity.
+
+Questions or Concerns
+If you have any questions about this research, please contact the Principal Investigator, Nykko Vitali, at nvitali@fas.harvard.edu. If you have any concerns about your rights as a research participant, you may contact cuhs@harvard.edu
+
+Use of Your Data
+If you are comfortable with us using your responses now that you know the full purpose of the study, you don't need to do anything. If you would prefer that we not use your responses, please reach out to the Principal Investigator and let them know. We will then remove your data from the study and delete it.
+
+Thank you again for your participation!
+
+        `;
+        generateAndDownloadPdf(debriefText, `Debrief_Form_${sessionId || participantId}.pdf`);
+
+        if (isProduction) {
+            // DEACTIVATE the listener so this final redirect isn't blocked
+            window.removeEventListener('beforeunload', handleEarlyExit);
+            
+            // Redirect to Prolific after a short delay to ensure download starts
+            setTimeout(() => {
+                window.location.href = PROLIFIC_COMPLETION_URL;
+            }, 500);
+        } else {
+            // For local testing, just proceed to the summary page
+            showSummaryPhase();
+        }
+    });
+
+    // 3. We create the event listener for the continue button.
+    continueAfterDebriefButton.addEventListener('click', () => {
+        if (isProduction) {
+            // DEACTIVATE the listener before the final redirect
+            window.removeEventListener('beforeunload', handleEarlyExit);
+            window.location.href = PROLIFIC_COMPLETION_URL;
+        } else {
+            // For local testing, just proceed to the summary page
+            showSummaryPhase();
+        }
+    });
+
+    confirmInstructionsButton.addEventListener('click', () => {
+        logUiEvent('instructions_understand_clicked');
+        // Show the modal pop-up instead of the next page
+        demographicsModal.style.display = 'flex';
+    });
+
+    modalContinueButton.addEventListener('click', () => {
+        logUiEvent('demographics_modal_continue_clicked');
+        demographicsModal.style.display = 'none'; // Hide the modal
+        showMainPhase('initial'); // Now, show the demographics page
+    });
+
+    finalInstructionsButton.addEventListener('click', () => {
+        logUiEvent('final_instructions_understand_clicked');
+        // Hides the pop-up and sets the flag. That is its only job.
+        finalInstructionsModal.style.display = 'none';
+        isUserReady = true;
+        // After the user is ready, we immediately check if we can proceed.
+        // This handles the case where the user clicks *before* the backend is ready.
+        tryProceedToChat();
+    });
+    // --- Event Listeners ---
+    // handleEarlyExit already declared above, no need to redeclare
+
+    initialForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        logUiEvent('initial_form_begin_conversation_clicked');
+
+        // Pre-validate and build data before locking UI or opening modals
+        const formData = new FormData(initialForm);
+
+        // Validate required Likert bubbles
+        const requiredLikerts = ['self_detection_speed', 'others_detection_speed', 'ai_capabilities_rating', 'trust_in_ai'];
+        for (const field of requiredLikerts) {
+            if (!formData.get(field)) {
+                showError("Please select a value for all rating questions.");
+                return;
+            }
+        }
+
+        // Validate AI usage frequency and models
+        const ai_usage_frequency_val = formData.get('ai_usage_frequency');
+        if (!ai_usage_frequency_val) {
+            showError("Please select your AI usage frequency.");
+            return;
+        }
+        const ai_models_used_vals = formData.getAll('ai_models_used');
+        if (ai_usage_frequency_val !== '0' && ai_models_used_vals.length === 0) {
+            showError("Since you use AI chatbots, please select at least one model you have used.");
+            return;
+        }
+        if (ai_usage_frequency_val === '0' && ai_models_used_vals.length > 0) {
+            showError("You selected 'Never' for AI usage, but also selected specific models. Please correct your selection.");
+            return;
+        }
+
+        // Validate demographics
+        const ageStr = formData.get('age');
+        const genderVal = formData.get('gender');
+        const educationVal = formData.get('education');
+        const incomeVal = formData.get('income');
+        const ethnicityVals = formData.getAll('ethnicity');  // ADD THIS LINE
+
+
+        const ageNum = parseInt(ageStr, 10);
+        if (!ageStr || Number.isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+            showError("Please enter a valid age (18-100).");
+            return;
+        }
+        if (!genderVal) {
+            showError("Please select a gender.");
+            return;
+        }
+        if (!educationVal) {
+            showError("Please select your highest education level.");
+            return;
+        }
+        if (!incomeVal) {
+            showError("Please select your annual household income.");
+            return;
+        }
+        if (ethnicityVals.length === 0) {
+            showError("Please select at least one ethnicity option.");
+            return;
+        }
+
+        // Validate new demographics
+        const politicalAffiliationVal = formData.get('political_affiliation');
+        if (!politicalAffiliationVal) {
+            showError("Please select your political affiliation.");
+            return;
+        }
+        const socialMediaVals = formData.getAll('social_media');
+        if (socialMediaVals.length === 0) {
+            showError("Please select at least one social media platform option (or 'None').");
+            return;
+        }
+        const internetUsageVal = formData.get('internet_usage_per_week');
+        if (!internetUsageVal) {
+            showError("Please select your hours of internet use per week.");
+            return;
+        }
+
+        const data = {
+            ai_usage_frequency: parseInt(ai_usage_frequency_val, 10),
+            ai_models_used: ai_models_used_vals,
+            self_detection_speed: parseInt(formData.get('self_detection_speed'), 10),
+            others_detection_speed: parseInt(formData.get('others_detection_speed'), 10),
+            ai_capabilities_rating: parseInt(formData.get('ai_capabilities_rating'), 10),
+            trust_in_ai: parseInt(formData.get('trust_in_ai'), 10),
+            age: ageNum,
+            gender: genderVal,
+            education: educationVal,
+            ethnicity: formData.getAll('ethnicity'),
+            income: incomeVal,
+            political_affiliation: politicalAffiliationVal,
+            social_media_platforms: socialMediaVals,
+            internet_usage_per_week: parseInt(internetUsageVal, 10),
+            // Identifiers
+            participant_id: participantId,
+            prolific_pid: prolificPid
+        };
+
+        // Reset state flags for this attempt
+        isBackendReady = false;
+        isUserReady = false;
+        
+        // Show the final instructions pop-up
+        finalInstructionsModal.style.display = 'flex';
+
+        // Show loading indicator and disable form button
+        initLoadingDiv.style.display = 'flex';
+        initialForm.querySelector('button').disabled = true;
+        // Lock all demographics controls after capturing values
+        setInitialFormControlsDisabled(true);
+
+        // This self-contained function handles the entire async process
+        const performInitialization = async (payload) => {
+            try {
+                // Start progress bar animation
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                    let currentProgress = 0;
+                    progressInterval = setInterval(() => {
+                        const increment = Math.random() * 5;
+                        currentProgress = Math.min(currentProgress + increment, 99);
+                        progressBar.style.width = currentProgress + '%';
+                    }, 800);
+                }
+
+                const response = await fetch('/initialize_study', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(getApiErrorMessage(result, 'Failed to initialize study.'));
+                }
+
+                // --- FULL, RESTORED SESSION SETUP LOGIC ---
+                sessionId = result.session_id;
+                localStorage.setItem('sessionId', sessionId);
+                currentTurn = 0;
+                messageList.innerHTML = '';
+                
+                // Backend is now ready, set the flag and try to proceed
+                isBackendReady = true;
+                // After the backend is ready, we immediately check if we can proceed.
+                // This handles the case where the backend finishes *before* the user has clicked.
+                tryProceedToChat();
+
+
+            } catch (error) {
+                // This block runs if any part of the 'try' block fails
+                // SILENT: Study initialization failure - Railway logs only
+                finalInstructionsModal.style.display = 'none';
+                initLoadingDiv.style.display = 'none';
+                clearInterval(progressInterval);
+                initialForm.querySelector('button').disabled = false;
+                // Unlock the form so the participant can correct inputs
+                setInitialFormControlsDisabled(false);
+            }
+        };
+
+        // Run the async function
+        performInitialization(data);
+
+        // 2. ACTIVATE the early exit listener now that the study has officially begun
+        if (isProduction) {
+            window.addEventListener('beforeunload', handleEarlyExit);
+        }
+    });
+    
+    // *** FIX: ADDING THE MISSING EVENT LISTENERS BACK ***
+    sendMessageButton.addEventListener('click', handleSendMessage);
+    userMessageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleSendMessage();
+        }
+    });
+
+    // NEW: Binary choice button event listeners
+    const choiceHumanButton = document.getElementById('choice-human-button');
+    const choiceAiButton = document.getElementById('choice-ai-button');
+    const binaryChoiceSection = document.getElementById('binary-choice-section');
+    const confidenceSection = document.getElementById('confidence-section');
+    const chosenLabel = document.getElementById('chosen-label');
+
+    // COMMENTED OUT: Counterbalancing button order - can be enabled if advisor approves
+    // function randomizeButtonOrder() {
+    //     const buttonsContainer = document.getElementById('binary-choice-buttons');
+    //     if (Math.random() < 0.5) {
+    //         buttonsContainer.appendChild(choiceHumanButton);
+    //         buttonsContainer.appendChild(choiceAiButton);
+    //         buttonOrderRandomized = false;
+    //     } else {
+    //         buttonsContainer.appendChild(choiceAiButton);
+    //         buttonsContainer.appendChild(choiceHumanButton);
+    //         buttonOrderRandomized = true;
+    //     }
+    // }
+    // randomizeButtonOrder(); // Call this when assessment area is first shown
+
+    choiceHumanButton.addEventListener('click', () => {
+        handleBinaryChoice('human');
+    });
+
+    choiceAiButton.addEventListener('click', () => {
+        handleBinaryChoice('ai');
+    });
+
+    function handleBinaryChoice(choice) {
+        // Record the choice and timing
+        binaryChoice = choice;
+        binaryChoiceTime = Date.now() - binaryChoiceStartTime;
+
+        // Log the choice
+        logToRailway({
+            type: 'BINARY_CHOICE_MADE',
+            message: `User selected: ${choice}`,
+            context: {
+                choice: choice,
+                time_taken_ms: binaryChoiceTime,
+                turn: currentTurn
+            }
+        });
+
+        // Hide binary choice, show confidence slider
+        binaryChoiceSection.style.display = 'none';
+        confidenceSection.style.display = 'block';
+        chosenLabel.textContent = choice.charAt(0).toUpperCase() + choice.slice(1);
+
+        // Reset confidence slider to 50% for new choice
+        confidenceSlider.value = 50;
+        confidenceValueSpan.textContent = '50';
+        confidenceStartTime = Date.now(); // Start tracking confidence slider timing
+        sliderInteractionLog = []; // Reset slider interaction log
+        submitRatingButton.disabled = false; // Enable submit button
+    }
+
+    // NEW: Track when user first interacts with confidence slider
+    confidenceSlider.addEventListener('mousedown', () => {
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (!confidenceStartTime && baseMs) {
+            confidenceStartTime = Date.now();
+            sliderInteractionLog.push({
+                event: 'slider_first_touch',
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - baseMs,
+                value: parseFloat(confidenceSlider.value)
+            });
+        }
+    });
+    
+    confidenceSlider.addEventListener('touchstart', () => {
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (!confidenceStartTime && baseMs) {
+            confidenceStartTime = Date.now();
+            sliderInteractionLog.push({
+                event: 'slider_first_touch',
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - baseMs,
+                value: parseFloat(confidenceSlider.value)
+            });
+        }
+    });
+
+    // MODIFIED event listener for confidence slider to handle activation and enabling submit
+    confidenceSlider.addEventListener('input', () => {
+        let value = parseInt(confidenceSlider.value); // Now 0-100 scale
+
+        // NEW: Track all slider movements for enhanced timing analysis
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (confidenceStartTime && baseMs) {
+            sliderInteractionLog.push({
+                event: 'slider_move',
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - baseMs,
+                timestampFromFirstTouch: Date.now() - confidenceStartTime,
+                value: value
+            });
+        }
+
+        // Update the displayed value
+        confidenceValueSpan.textContent = value;
+
+        // Submit button is already enabled by handleBinaryChoice
+        // No special restrictions - any value 0-100 is valid
+    });
+
+    function animateTypingIndicator(messageLength) {
+        // Show indicator immediately
+        typingIndicator.style.display = 'flex';
+        scrollToBottom();
+
+        // Tag this animation run so stale timeouts can't re-show the indicator later
+        const runId = String(Date.now());
+        typingIndicator.dataset.runId = runId;
+        
+        // That's it - just show it and leave it on until the message arrives
+        return null;
+    }
+            
+
+
+
+    // NEW: Retry logic for API requests - now returns network delay
+    async function sendMessageWithRetry(messageText, typingDelaySeconds, maxRetries = 3) {
+        const apiCallStartTime = Date.now();
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Log retry attempt to Railway
+                logToRailway({
+                    type: 'API_REQUEST_ATTEMPT',
+                    message: `Sending message to server (attempt ${attempt}/${maxRetries})`,
+                    context: {
+                        session_id: sessionId,
+                        message_length: messageText.length,
+                        attempt: attempt,
+                        max_retries: maxRetries
+                    }
+                });
+
+                // Create AbortController for timeout
+                // NEW: Reduced timeout to 60 seconds to prevent excessive waits
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout (reduced from 120s)
+                
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: messageText,
+                        typing_indicator_delay_seconds: typingDelaySeconds
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Calculate network delay for successful response
+                    const apiCallEndTime = Date.now();
+                    const networkDelayMs = apiCallEndTime - apiCallStartTime;
+                    const networkDelaySeconds = networkDelayMs / 1000;
+                    
+                    // Success - log and return with network delay
+                    logToRailway({
+                        type: 'API_RESPONSE_SUCCESS',
+                        message: `Received response from /send_message (attempt ${attempt})`,
+                        context: {
+                            response_ok: response.ok,
+                            turn: result.turn,
+                            ai_response_length: result.ai_response ? result.ai_response.length : 0,
+                            attempt: attempt,
+                            network_delay_ms: networkDelayMs,
+                            network_delay_seconds: networkDelaySeconds
+                        }
+                    });
+                    return { response, result, networkDelaySeconds, attempts: attempt };
+                } else {
+                    // API error - log and continue to retry
+                    logToRailway({
+                        type: 'API_ERROR',
+                        message: `API error on attempt ${attempt}/${maxRetries}`,
+                        context: {
+                            response_ok: response.ok,
+                            response_status: response.status,
+                            result: result,
+                            attempt: attempt
+                        }
+                    });
+                    if (attempt === maxRetries) throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                }
+            } catch (error) {
+                // Network/fetch error - log and continue to retry
+                logToRailway({
+                    type: 'NETWORK_ERROR',
+                    message: `Network error on attempt ${attempt}/${maxRetries}: ${error.message}`,
+                    context: {
+                        error_name: error.name,
+                        error_message: error.message,
+                        attempt: attempt,
+                        max_retries: maxRetries
+                    }
+                });
+                if (attempt === maxRetries) throw error;
+                
+                // No delay - retry immediately
+            }
+        }
+    }
+
+    // NEW: Retry logic for network delay updates with fallback storage and metadata tracking
+    async function updateNetworkDelayWithRetry(sessionId, turn, networkDelaySeconds, sendAttempts = 1, maxRetries = 2) {
+        const metadata = {
+            status: null,
+            attempts_required: 0,
+            failure_types: [],
+            fallback_reason: null,
+            retry_delays: []
+        };
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            metadata.attempts_required = attempt;
+            try {
+                logToRailway({
+                    type: 'NETWORK_DELAY_UPDATE_ATTEMPT',
+                    message: `Updating network delay (attempt ${attempt}/${maxRetries})`,
+                    context: {
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        attempt: attempt
+                    }
+                });
+
+                // Create AbortController for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout (increased from 15s)
+                
+                const response = await fetch('/update_network_delay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        send_attempts: sendAttempts,
+                        metadata: metadata
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    // Success - set status and return metadata
+                    metadata.status = attempt === 1 ? 'primary_success' : 'retry_success';
+                    logToRailway({
+                        type: 'NETWORK_DELAY_UPDATED',
+                        message: `Network delay successfully updated (attempt ${attempt})`,
+                        context: {
+                            network_delay_seconds: networkDelaySeconds,
+                            turn: turn,
+                            session_id: sessionId,
+                            attempt: attempt,
+                            metadata: metadata
+                        }
+                    });
+                    return { success: true, metadata };
+                } else {
+                    // API error - track error type and continue to retry
+                    const errorType = `${response.status}_error`;
+                    metadata.failure_types.push(errorType);
+                    
+                    logToRailway({
+                        type: 'NETWORK_DELAY_API_ERROR',
+                        message: `Network delay update API error (attempt ${attempt}/${maxRetries})`,
+                        context: {
+                            response_status: response.status,
+                            attempt: attempt,
+                            turn: turn,
+                            error_type: errorType
+                        }
+                    });
+                    if (attempt === maxRetries) throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                }
+            } catch (error) {
+                // Network/fetch error - track error type and continue to retry
+                const errorType = error.name === 'AbortError' ? 'timeout' : 
+                                 error.name === 'TypeError' ? 'network_error' : 
+                                 error.name || 'unknown_error';
+                metadata.failure_types.push(errorType);
+                
+                logToRailway({
+                    type: 'NETWORK_DELAY_NETWORK_ERROR',
+                    message: `Network delay update network error (attempt ${attempt}/${maxRetries}): ${error.message}`,
+                    context: {
+                        error_name: error.name,
+                        error_message: error.message,
+                        error_type: errorType,
+                        attempt: attempt,
+                        turn: turn
+                    }
+                });
+                
+                if (attempt === maxRetries) {
+                    // All retries failed - set fallback status and store for fallback
+                    metadata.status = 'fallback_used';
+                    metadata.fallback_reason = `All ${maxRetries} retries failed: ${error.message}`;
+
+                    const fallbackData = {
+                        session_id: sessionId,
+                        turn: turn,
+                        network_delay_seconds: networkDelaySeconds,
+                        failure_reason: error.message,
+                        calculated_at: Date.now(),
+                        retry_attempts: maxRetries,
+                        metadata: metadata
+                    };
+                    pendingNetworkDelayUpdates.push(fallbackData);
+
+                    logToRailway({
+                        type: 'NETWORK_DELAY_FALLBACK_STORED',
+                        message: 'All retries failed - stored for fallback processing',
+                        context: {
+                            fallback_data: fallbackData,
+                            pending_count: pendingNetworkDelayUpdates.length
+                        }
+                    });
+                    return { success: false, metadata };
+                }
+
+                // Wait briefly before retry (reduced backoff)
+                const backoffMs = 2000; // Fixed 2 second delay instead of exponential
+                metadata.retry_delays.push(backoffMs);
+                await new Promise(resolve => setTimeout(resolve, backoffMs));
+            }
+        }
+    }
+
+    async function handleSendMessage() {
+        const messageText = userMessageInput.value.trim();
+        if (!messageText || !sessionId) return;
+
+        addMessageToUI(messageText, 'user');
+
+        userMessageInput.value = '';
+        userMessageInput.disabled = true;
+        sendMessageButton.disabled = true;
+        chatInputContainer.style.display = 'none';
+        assessmentAreaDiv.style.display = 'none';
+
+        const indicatorDelay = Math.random() * (7000 - 5000) + 5000;
+        
+        // Log to Railway only
+        logToRailway({
+            type: 'TYPING_INDICATOR_DEBUG',
+            message: `Waiting ${(indicatorDelay/1000).toFixed(1)}s before showing typing indicator`,
+            context: { delay_seconds: indicatorDelay/1000 }
+        });
+        
+        setTimeout(() => {
+            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
+                // Start the typing animation with periodic pauses
+                animateTypingIndicator(messageText.length);
+                // Update timer message for State 1→2 transition (now waiting for AI response)
+                updateTimerMessage();
+            }
+        }, indicatorDelay);
+
+        try {
+            // Use new retry logic that returns network delay and attempt count
+            const { response, result, networkDelaySeconds, attempts } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
+
+            // If we get here, the retry succeeded - hide typing indicator and process response
+            typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
+            typingIndicator.style.display = 'none';
+
+            // Process the successful response
+            addMessageToUI(result.ai_response, 'assistant');
+
+            // NEW: Add backend retry time and attempts to totals
+            const backendRetryData = result.backend_retry_metadata || { retry_attempts: 0, retry_time_seconds: 0 };
+            const totalNetworkDelaySeconds = networkDelaySeconds + backendRetryData.retry_time_seconds;
+            const totalAttempts = attempts + backendRetryData.retry_attempts;
+
+            // Update the backend with TOTAL network delay data AND TOTAL send attempts using retry logic
+            const updateResult = await updateNetworkDelayWithRetry(sessionId, result.turn, totalNetworkDelaySeconds, totalAttempts);
+            
+            if (!updateResult.success) {
+                // All retries failed - data is stored in pendingNetworkDelayUpdates for later processing
+                logToRailway({
+                    type: 'NETWORK_DELAY_FINAL_FAILURE',
+                    message: 'Network delay update failed after all retries - stored for fallback',
+                    context: {
+                        network_delay_seconds: networkDelaySeconds,
+                        turn: result.turn,
+                        session_id: sessionId,
+                        pending_fallbacks: pendingNetworkDelayUpdates.length,
+                        metadata: updateResult.metadata
+                    }
+                });
+            }
+            
+            currentTurn = result.turn;
+            aiResponseTimestamp = result.timestamp;
+
+            // Reset tab visibility tracking for new turn
+            cumulativeTabHiddenMs = 0;
+
+            // --- MODIFIED: Binary choice + slider setup logic ---
+            assessmentAreaDiv.style.display = 'block';
+            chatInputContainer.style.display = 'none';
+            assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
+
+            // Update timer message for State 2→3 transition (now rating phase)
+            updateTimerMessage();
+
+            // NEW: Show binary choice section, hide confidence section
+            binaryChoiceSection.style.display = 'block';
+            confidenceSection.style.display = 'none';
+
+            // NEW: Reset binary choice tracking for new turn
+            binaryChoice = null;
+            binaryChoiceStartTime = Date.now(); // Start timing for binary choice
+            binaryChoiceTime = null;
+
+            // Reset timing variables for this turn
+            confidenceStartTime = null;
+            sliderInteractionLog = [];
+
+            // REMOVED: Old slider initialization logic - now handled by handleBinaryChoice()
+            // Slider is no longer shown initially - binary choice comes first
+
+            // Reset other UI elements
+            submitRatingButton.style.display = 'block';
+            feelsOffCheckbox.checked = false;
+            commentInputArea.style.display = 'none';
+            feelsOffCommentTextarea.value = '';
+            messageList.scrollTop = messageList.scrollHeight;
+
+        } catch (error) {
+            // If we reach here, all retries failed - log the final failure
+            logToRailway({
+                type: 'CRITICAL_FAILURE',
+                message: `All retries failed: ${error.message}`,
+                stack: error.stack,
+                context: {
+                    function: 'handleSendMessage',
+                    time_expired: timeExpired,
+                    user_message_length: messageText.length,
+                    final_error: true
+                }
+            });
+            
+            // Hide typing indicator and reset UI - but keep conversation going
+            // The user can send another message to continue
+            typingIndicator.style.display = 'none';
+            userMessageInput.disabled = false;
+            sendMessageButton.disabled = false;
+            chatInputContainer.style.display = 'flex';
+            assessmentAreaDiv.style.display = 'none';
+            
+            // IMPORTANT: We don't show any error to the user
+            // They can just send another message and the conversation continues
+        }
+    }
+
+
+    submitRatingButton.addEventListener('click', async () => {
+        if (!sessionId) return;
+
+        // NEW: Validate binary choice was made
+        if (!binaryChoice) {
+            logToRailway({
+                type: 'SUBMIT_ERROR',
+                message: 'Submit attempt without binary choice',
+                context: { turn: currentTurn }
+            });
+            return; // Should not happen due to UI flow, but safety check
+        }
+
+        // NEW: For time expired, we no longer restrict confidence values
+        // The binary choice (Human/AI) is the main decision, confidence is always 0-100%
+
+        if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() === '') {
+            // SILENT: No participant-visible error - just prevent submission
+            return;
+        }
+
+        ratingLoadingDiv.style.display = 'block';
+        submitRatingButton.disabled = true;
+        confidenceSlider.disabled = true;
+
+        const confidencePercent = parseInt(confidenceSlider.value); // 0-100 scale
+        const confidence = confidencePercent / 100; // Convert to 0-1 for backend compatibility
+        lastConfidenceValue = confidencePercent; // NEW: Save the submitted value (0-100) for the next round
+
+        // NEW: Calculate enhanced timing data
+        let decisionTimeSeconds = null;
+        let readingTimeSeconds = null;
+        let activeDecisionTimeSeconds = null;
+
+        const baseMs = tsToMs(aiResponseTimestamp);
+        if (baseMs) {
+            // NEW: Log the final submitted value to ensure data integrity
+            sliderInteractionLog.push({
+                event: 'slider_submit',
+                timestamp: Date.now(),
+                timestampFromResponse: Date.now() - baseMs,
+                timestampFromFirstTouch: confidenceStartTime ? Date.now() - confidenceStartTime : null,
+                value: confidence
+            });
+            
+            decisionTimeSeconds = (Date.now() - baseMs) / 1000;
+            if (confidenceStartTime) {
+                // User touched slider: split into reading + active time
+                readingTimeSeconds = (confidenceStartTime - baseMs) / 1000;
+                activeDecisionTimeSeconds = (Date.now() - confidenceStartTime) / 1000;
+            } else {
+                // User never touched slider: all time is reading, zero active
+                readingTimeSeconds = decisionTimeSeconds;
+                activeDecisionTimeSeconds = 0;
+            }
+        } else {
+            // Log to Railway only
+            logToRailway({
+                type: 'TIMING_WARNING',
+                message: 'aiResponseTimestamp missing; timing metrics will be null',
+                context: { function: 'submitRatingButton' }
+            });
+        }
+
+        // Log to Railway only
+        logToRailway({
+            type: 'RATING_SUBMISSION',
+            message: 'Submitting rating with binary choice and timing metrics',
+            context: {
+                binary_choice: binaryChoice,
+                binary_choice_time_ms: binaryChoiceTime,
+                confidence_percent: confidencePercent,
+                confidence_normalized: confidence,
+                decision_time_seconds: decisionTimeSeconds,
+                reading_time_seconds: readingTimeSeconds,
+                active_decision_time_seconds: activeDecisionTimeSeconds,
+                turn: currentTurn
+            }
+        });
+
+        try {
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds for rating submission
+
+            const response = await fetch('/submit_rating', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    binary_choice: binaryChoice, // 'human' or 'ai'
+                    binary_choice_time_ms: binaryChoiceTime, // Time taken to make binary choice
+                    confidence: confidence, // 0-1 scale (converted from 0-100)
+                    confidence_percent: confidencePercent, // 0-100 scale (original)
+                    decision_time_seconds: decisionTimeSeconds,
+                    reading_time_seconds: readingTimeSeconds,
+                    active_decision_time_seconds: activeDecisionTimeSeconds,
+                    slider_interaction_log: sliderInteractionLog
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            const result = await response.json();
+            // Log to Railway only
+            logToRailway({
+                type: 'RATING_RESPONSE',
+                message: 'Rating submission response from server',
+                context: {
+                    study_over: result.study_over,
+                    response_ok: response.ok
+                }
+            });
+
+            if (response.ok) {
+                if (result.study_over) {
+                    // Clean up timer
+                    if (studyTimer) {
+                        clearInterval(studyTimer);
+                    }
+                    document.getElementById('timer-display').style.display = 'none';
+                    
+                    // MODIFICATION START
+                    finalSummaryData = result.session_data_summary; // Store data
+                    showMainPhase('feedback'); // Go to feedback phase first
+                } else {
+                    if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() !== '') {
+                        assessmentAreaDiv.querySelector('h4').textContent = "Rating Submitted. Now, please submit your comment:";
+                        submitRatingButton.style.display = 'none';
+                        confidenceSlider.style.display = 'none';
+                        confidenceValueSpan.style.display = 'none';
+                        document.getElementById('submit-rating-button').previousElementSibling.style.display = 'none';
+                        document.getElementById('comment-section').style.display = 'block';
+                        if (!commentInputArea.style.display || commentInputArea.style.display === 'none') {
+                            commentInputArea.style.display = 'block';
+                        }
+                        feelsOffCommentTextarea.focus();
+                        chatInputContainer.style.display = 'none';
+                    } else {
+                        assessmentAreaDiv.style.display = 'none';
+                        chatInputContainer.style.display = 'flex';
+                        userMessageInput.disabled = false;
+                        sendMessageButton.disabled = false;
+                        userMessageInput.focus();
+                        
+                        // Update timer message for State 3→1 transition (back to chat input)
+                        updateTimerMessage();
+                    }
+                }
+            } else {
+                // SILENT: No participant-visible error - logged to Railway only
+                submitRatingButton.disabled = false;
+                confidenceSlider.disabled = false;
+            }
+        } catch (error) {
+            // SILENT: No participant-visible error - logged to Railway only
+            // Error already logged to Railway if needed
+            submitRatingButton.disabled = false;
+            confidenceSlider.disabled = false;
+        } finally {
+            ratingLoadingDiv.style.display = 'none';
+        }
+    });
+
+    submitFeedbackButton.addEventListener('click', async () => {
+        const commentText = feedbackTextarea.value.trim();
+        submitFeedbackButton.disabled = true;
+        skipFeedbackButton.disabled = true;
+
+        if (commentText) {
+            try {
+                // Send final comment to the correct endpoint
+                await fetch('/submit_final_comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        comment: commentText
+                    }),
+                });
+            } catch (error) {
+                // Log to Railway only
+                logToRailway({
+                    type: 'FEEDBACK_SUBMISSION_ERROR',
+                    message: error.message,
+                    stack: error.stack,
+                    context: { function: 'submitFeedbackButton' }
+                });
+            }
+        }
+        // Proceed to the final page
+        showMainPhase('final');
+        displayFinalPage(finalSummaryData);
+    });
+
+    skipFeedbackButton.addEventListener('click', () => {
+        // Just proceed directly to the final page
+        showMainPhase('final');
+        displayFinalPage(finalSummaryData);
+    });
+
+    submitCommentButton.addEventListener('click', async () => {
+        if (!sessionId) {
+            // SILENT: No participant-visible error - just prevent submission
+            return;
+        }
+        // LEGACY CODE REMOVED - this checkbox validation can never be reached in current UI flow
+
+        const commentText = feelsOffCommentTextarea.value.trim();
+        if (commentText === '') {
+            // SILENT: No participant-visible error - just prevent submission
+            return;
+        }
+
+        commentLoadingDiv.style.display = 'block';
+        submitCommentButton.disabled = true;
+        feelsOffCheckbox.disabled = true;
+
+        try {
+            const response = await fetch('/submit_comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, comment: commentText }),
+            });
+            const result = await response.json();
+            if (response.ok) {
+                // Log to Railway only
+                logToRailway({
+                    type: 'COMMENT_SUBMISSION_SUCCESS',
+                    message: 'Comment submitted successfully',
+                    context: { function: 'submitCommentButton' }
+                });
+                feelsOffCommentTextarea.value = '';
+                feelsOffCheckbox.checked = false;
+                commentInputArea.style.display = 'none';
+
+                if (finalPageDiv.style.display === 'none') {
+                    assessmentAreaDiv.style.display = 'none';
+                    chatInputContainer.style.display = 'flex';
+                    userMessageInput.disabled = false;
+                    sendMessageButton.disabled = false;
+                    userMessageInput.focus();
+                }
+            } else {
+                // SILENT: No participant-visible error - logged to Railway only
+            }
+        } catch (error) {
+            // SILENT: No participant-visible error - logged to Railway only
+            // Error already logged to Railway if needed
+        } finally {
+            commentLoadingDiv.style.display = 'none';
+            if (commentInputArea.style.display !== 'none') {
+                 submitCommentButton.disabled = false;
+                 feelsOffCheckbox.disabled = false;
+            }
+        }
+    });
+
+    feelsOffCheckbox.addEventListener('change', () => {
+        commentInputArea.style.display = feelsOffCheckbox.checked ? 'block' : 'none';
+    });
+
+    function displayFinalPage(summary) {
+        // MODIFIED: This function now just populates the data.
+        // The visibility is controlled by the new event listeners.
+        finalDecisionText.textContent = `You determined that you were ${summary.ai_detected ? 'talking to an AI' : 'talking to a human'}.`;
+        if (summary.final_decision_time) {
+            finalDecisionTimeText.textContent = `Time taken to make final decision: ${parseFloat(summary.final_decision_time).toFixed(2)} seconds.`;
+        }
+        let trendText = "Turn | Confidence | Decision Time (s)\n";
+        trendText += "---------------------------------------\n";
+        if (summary.confidence_ratings) {
+            summary.confidence_ratings.forEach(r => {
+                trendText += `${String(r.turn).padEnd(4)} | ${parseFloat(r.confidence).toFixed(2).padEnd(10)} | ${r.decision_time_seconds ? parseFloat(r.decision_time_seconds).toFixed(2) : 'N/A'}\n`;
+            });
+        }
+        confidenceTrendData.textContent = trendText;
+        researcherDataSection.style.display = 'block';
+        researcherDataContent.textContent = "";
+
+        // Show the first part of the final page
+        debriefPhaseDiv.style.display = 'block';
+        summaryPhaseDiv.style.display = 'none';
+    }
+
+    newSessionButton.addEventListener('click', () => {
+        localStorage.removeItem('sessionId');
+        sessionId = null;
+        currentTurn = 0;
+        aiResponseTimestamp = null;
+        lastConfidenceValue = 0.5; // Reset for new session
+        // NEW: Reset timing variables
+        confidenceStartTime = null;
+        sliderInteractionLog = [];
+        messageList.innerHTML = '';
+        initialForm.reset();
+        
+        // Manually reset sliders and their value displays to default
+        allSliders.forEach(slider => {
+            slider.value = slider.defaultValue;
+            const valueSpan = slider.nextElementSibling;
+            if (valueSpan && valueSpan.classList.contains('slider-value')) {
+                valueSpan.textContent = slider.defaultValue;
+            }
+        });
+
+        researcherDataSection.style.display = 'none';
+        researcherDataContent.textContent = '';
+        showMainPhase('consent');
+        //  reset the consent form's state for the new session
+        consentContentDiv.style.display = 'block';
+        consentActionsDiv.style.display = 'block';
+        consentDownloadPromptDiv.style.display = 'none';
+    });
+
+    loadResearcherDataButton.addEventListener('click', async () => {
+        if (!sessionId) {
+            researcherDataContent.textContent = "No active session ID to load data for.";
+            return;
+        }
+        loadResearcherDataButton.disabled = true;
+        researcherDataContent.textContent = "Loading researcher data...";
+        try {
+            const response = await fetch(`/get_researcher_data/${sessionId}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                researcherDataContent.textContent = `Error loading researcher data: ${response.status} ${response.statusText}. Details: ${errorText}`;
+                return;
+            }
+            const data = await response.json();
+            researcherDataContent.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+            researcherDataContent.textContent = `Error fetching or parsing researcher data: ${error.message}`;
+            // Log to Railway only
+            logToRailway({
+                type: 'RESEARCHER_DATA_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: { function: 'loadResearcherDataButton' }
+            });
+        } finally {
+            loadResearcherDataButton.disabled = false;
+        }
+    });
+
+    // --- Initial Page Load ---
+    localStorage.removeItem('sessionId');
+    aiResponseTimestamp = null;
+    // NEW: Reset timing variables
+    confidenceStartTime = null;
+    sliderInteractionLog = [];
+    showMainPhase('consent'); // Start with the consent form instead of 'initial'
+    // Log page load event with basic metadata
+    logUiEvent('page_load', {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        referrer: document.referrer || null,
+        isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+        screenWidth: screen.width,
+        screenHeight: screen.height
+    });
+
+    // NEW: Tab visibility tracking
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            tabHiddenStartTime = Date.now();
+            logUiEvent('tab_hidden', {
+                turn: currentTurn,
+                timestamp: tabHiddenStartTime
+            });
+        } else {
+            if (tabHiddenStartTime) {
+                const hiddenDuration = Date.now() - tabHiddenStartTime;
+                cumulativeTabHiddenMs += hiddenDuration;
+                logUiEvent('tab_visible', {
+                    turn: currentTurn,
+                    hidden_duration_ms: hiddenDuration,
+                    cumulative_hidden_ms: cumulativeTabHiddenMs,
+                    timestamp: Date.now()
+                });
+                tabHiddenStartTime = null;
+            }
+        }
+    });
+
+});
