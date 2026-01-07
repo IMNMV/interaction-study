@@ -966,6 +966,8 @@ Thank you again for your participation!
         // Hide binary choice, show confidence slider
         binaryChoiceSection.style.display = 'none';
         confidenceSection.style.display = 'block';
+        // Ensure slider is enabled for interaction on this step
+        confidenceSlider.disabled = false;
         chosenLabel.textContent = choice.charAt(0).toUpperCase() + choice.slice(1);
 
         // Reset confidence slider to 50% for new choice
@@ -1342,6 +1344,8 @@ Thank you again for your participation!
             // NEW: Show binary choice section, hide confidence section
             binaryChoiceSection.style.display = 'block';
             confidenceSection.style.display = 'none';
+            // Ensure slider is interactable for the upcoming choice step
+            confidenceSlider.disabled = false;
 
             // NEW: Reset binary choice tracking for new turn
             binaryChoice = null;
