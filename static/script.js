@@ -68,6 +68,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedbackTextarea = document.getElementById('feedback-textarea');
     const mainContainer = document.querySelector('.container'); // For the disagree message
 
+    // NEW: Human witness mode elements
+    const roleAssignmentPhaseDiv = document.getElementById('role-assignment-phase');
+    const waitingRoomPhaseDiv = document.getElementById('waiting-room-phase');
+    const assignedRoleTitleSpan = document.getElementById('assigned-role-title');
+    const interrogatorInstructionsDiv = document.getElementById('interrogator-instructions');
+    const witnessInstructionsDiv = document.getElementById('witness-instructions');
+    const enterWaitingRoomButton = document.getElementById('enter-waiting-room-button');
+    const waitingStatusP = document.getElementById('waiting-status');
+    const elapsedTimeSpan = document.getElementById('elapsed-time');
+    const waitingTimeoutWarningDiv = document.getElementById('waiting-timeout-warning');
+    const leaveWaitingRoomButton = document.getElementById('leave-waiting-room-button');
+    const interrogatorRatingUI = document.getElementById('interrogator-rating-ui');
+    const witnessWaitingUI = document.getElementById('witness-waiting-ui');
+
     // 1. Prolific Placeholder URLs
     const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=CR0KFVQO";
     const PROLIFIC_REJECTION_URL = "https://app.prolific.com/submissions/complete?cc=C120SCQ9";
@@ -182,6 +196,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Tab visibility tracking
     let tabHiddenStartTime = null;
     let cumulativeTabHiddenMs = 0;
+
+    // NEW: Human witness mode variables
+    let currentRole = null;  // 'interrogator' or 'witness'
+    let partnerSessionId = null;
+    let firstMessageSender = null;
+    let isHumanPartner = false;
+    let waitingForPartner = false;
+    let matchCheckInterval = null;
+    let partnerPollInterval = null;
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
     const allSliders = document.querySelectorAll('#initial-form input[type="range"]');
@@ -393,20 +416,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Ensure the instruction pop-up is hidden
             finalInstructionsModal.style.display = 'none';
-            
+
             // Switch to the main chat page view
             showMainPhase('chat_and_assessment_flow');
 
-            // It fully prepares the chat interface for use.
+            // Configure UI based on role
             assessmentAreaDiv.style.display = 'none';
-            chatInputContainer.style.display = 'flex';
-            userMessageInput.disabled = false;
-            sendMessageButton.disabled = false;
-            userMessageInput.focus();
-            
+
+            if (currentRole === 'witness') {
+                // Witnesses don't see rating UI, only chat
+                interrogatorRatingUI.style.display = 'none';
+                witnessWaitingUI.style.display = 'none';
+                chatInputContainer.style.display = 'flex';
+
+                // Check if witness sends first message
+                if (firstMessageSender === 'witness') {
+                    userMessageInput.disabled = false;
+                    sendMessageButton.disabled = false;
+                    userMessageInput.focus();
+                } else {
+                    // Waiting for interrogator's first message
+                    userMessageInput.disabled = true;
+                    sendMessageButton.disabled = true;
+                    waitingForPartner = true;
+                    addSystemMessage("Waiting for interrogator to send first message...");
+                    startPartnerResponsePolling();
+                }
+            } else {
+                // Interrogators see normal UI (rating area shown after AI response)
+                interrogatorRatingUI.style.display = 'block';
+                witnessWaitingUI.style.display = 'none';
+                chatInputContainer.style.display = 'flex';
+
+                // Check if interrogator sends first message
+                if (firstMessageSender === 'interrogator' || !isHumanPartner) {
+                    userMessageInput.disabled = false;
+                    sendMessageButton.disabled = false;
+                    userMessageInput.focus();
+                } else {
+                    // Waiting for witness's first message
+                    userMessageInput.disabled = true;
+                    sendMessageButton.disabled = true;
+                    waitingForPartner = true;
+                    addSystemMessage("Waiting for witness to send first message...");
+                    startPartnerResponsePolling();
+                }
+            }
+
             // START THE 7.5-MINUTE TIMER AND LOG CONVERSATION START
             startStudyTimer();
-            
+
             // Log when conversation actually begins
             logConversationStart();
         }
@@ -417,16 +476,20 @@ document.addEventListener('DOMContentLoaded', () => {
         consentPhaseDiv.style.display = 'none';
         instructionsPhaseDiv.style.display = 'none';
         initialSetupDiv.style.display = 'none';
+        roleAssignmentPhaseDiv.style.display = 'none'; // NEW
+        waitingRoomPhaseDiv.style.display = 'none'; // NEW
         chatInterfaceDiv.style.display = 'none';
         finalPageDiv.style.display = 'none';
-        feedbackPhaseDiv.style.display = 'none'; // ADD THIS LINE
+        feedbackPhaseDiv.style.display = 'none';
 
 
         if (phase === 'consent') consentPhaseDiv.style.display = 'block';
-        else if (phase === 'instructions') instructionsPhaseDiv.style.display = 'block'; // THIS LINE IS ADDED
+        else if (phase === 'instructions') instructionsPhaseDiv.style.display = 'block';
         else if (phase === 'initial') initialSetupDiv.style.display = 'block';
+        else if (phase === 'role-assignment') roleAssignmentPhaseDiv.style.display = 'block'; // NEW
+        else if (phase === 'waiting-room') waitingRoomPhaseDiv.style.display = 'block'; // NEW
         else if (phase === 'chat_and_assessment_flow') chatInterfaceDiv.style.display = 'block';
-        else if (phase === 'feedback') feedbackPhaseDiv.style.display = 'block'; // ADD THIS LINE
+        else if (phase === 'feedback') feedbackPhaseDiv.style.display = 'block';
         else if (phase === 'final') finalPageDiv.style.display = 'block';
     }
 
@@ -438,6 +501,233 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }, 0);
+    }
+
+    // NEW: Human witness mode functions
+    async function enterWaitingRoom() {
+        try {
+            const response = await fetch('/enter_waiting_room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            const result = await response.json();
+
+            if (result.ai_partner) {
+                // AI_WITNESS mode - simulate waiting room for consistency
+                isHumanPartner = false;
+                currentRole = 'interrogator';
+                showRoleAssignment('interrogator');
+
+                // Simulate a brief wait (5-10 seconds) for consistency
+                const simulatedWaitTime = Math.random() * 5000 + 5000; // 5-10 seconds
+                setTimeout(() => {
+                    tryProceedToChat();
+                }, simulatedWaitTime);
+            } else {
+                // HUMAN_WITNESS mode - show role and waiting room
+                isHumanPartner = true;
+                currentRole = result.role;
+                showRoleAssignment(result.role);
+            }
+        } catch (error) {
+            logToRailway({
+                type: 'WAITING_ROOM_ERROR',
+                message: `Failed to enter waiting room: ${error.message}`,
+                context: { error: error }
+            });
+            showError('Failed to enter waiting room. Please refresh and try again.');
+        }
+    }
+
+    function showRoleAssignment(role) {
+        showMainPhase('role-assignment');
+
+        assignedRoleTitleSpan.textContent = role.toUpperCase();
+
+        if (role === 'interrogator') {
+            interrogatorInstructionsDiv.style.display = 'block';
+            witnessInstructionsDiv.style.display = 'none';
+        } else {
+            interrogatorInstructionsDiv.style.display = 'none';
+            witnessInstructionsDiv.style.display = 'block';
+        }
+
+        logUiEvent('role_assigned', { role: role });
+    }
+
+    function startMatchPolling() {
+        let elapsed = 0;
+        const startTime = Date.now();
+
+        matchCheckInterval = setInterval(async () => {
+            elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+            // Update timer display
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            elapsedTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            // Check for match
+            try {
+                const response = await fetch(`/check_match_status?session_id=${sessionId}`);
+                const result = await response.json();
+
+                if (result.matched) {
+                    clearInterval(matchCheckInterval);
+                    partnerSessionId = result.partner_session_id;
+                    firstMessageSender = result.first_message_sender;
+
+                    logUiEvent('match_found', {
+                        partner_id: partnerSessionId,
+                        time_waiting: elapsed,
+                        first_sender: firstMessageSender
+                    });
+
+                    // Brief delay to show "Match found!" message
+                    waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
+                    setTimeout(() => {
+                        tryProceedToChat();
+                    }, 1500);
+                }
+
+                // Show timeout warning after 4 minutes
+                if (elapsed >= 240 && elapsed < 300) {
+                    waitingTimeoutWarningDiv.style.display = 'block';
+                }
+
+                // Hard timeout after 5 minutes
+                if (elapsed >= 300) {
+                    clearInterval(matchCheckInterval);
+                    handleMatchTimeout();
+                }
+            } catch (error) {
+                logToRailway({
+                    type: 'MATCH_CHECK_ERROR',
+                    message: `Error checking match status: ${error.message}`,
+                    context: { elapsed_seconds: elapsed }
+                });
+            }
+        }, 3000); // Poll every 3 seconds
+    }
+
+    function handleMatchTimeout() {
+        logUiEvent('match_timeout');
+
+        waitingStatusP.innerHTML = '<span style="color: #d9534f;">Unable to find a match</span>';
+        waitingTimeoutWarningDiv.style.display = 'block';
+
+        showError('No match found after 5 minutes. Please use the "Report Issue & Exit" button.');
+    }
+
+    function addSystemMessage(text) {
+        const messageBubble = document.createElement('div');
+        messageBubble.classList.add('message-bubble', 'system');
+        messageBubble.textContent = text;
+        messageBubble.style.cssText = 'background-color: #f8f9fa; color: #666; text-align: center; font-style: italic; border: 1px dashed #ddd; padding: 10px; margin: 10px 0; border-radius: 5px;';
+        messageList.appendChild(messageBubble);
+        scrollToBottom();
+    }
+
+    function startPartnerResponsePolling() {
+        if (partnerPollInterval) {
+            clearInterval(partnerPollInterval);
+        }
+
+        // NEW: Track how long we've been waiting for partner
+        const pollStartTime = Date.now();
+        const PARTNER_TIMEOUT_MS = 120000; // 2 minutes
+
+        partnerPollInterval = setInterval(async () => {
+            // NEW: Check if partner has been inactive too long
+            const elapsedMs = Date.now() - pollStartTime;
+            if (elapsedMs >= PARTNER_TIMEOUT_MS) {
+                clearInterval(partnerPollInterval);
+                partnerPollInterval = null;
+
+                logToRailway({
+                    type: 'PARTNER_TIMEOUT',
+                    message: 'Partner inactive for 2 minutes - assuming dropout',
+                    context: { elapsed_ms: elapsedMs }
+                });
+
+                handlePartnerDropout();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/check_partner_message?session_id=${sessionId}`);
+                const result = await response.json();
+
+                if (result.new_message) {
+                    // NEW: Verify message is actually newer (prevent duplicates/out-of-order)
+                    if (result.turn <= currentTurn) {
+                        logToRailway({
+                            type: 'MESSAGE_ORDER_WARNING',
+                            message: 'Received message with turn <= currentTurn (possible duplicate)',
+                            context: { received_turn: result.turn, current_turn: currentTurn }
+                        });
+                        return; // Skip this message, keep polling
+                    }
+
+                    clearInterval(partnerPollInterval);
+                    partnerPollInterval = null;
+
+                    // Add partner's message to UI
+                    addMessageToUI(result.message_text, 'assistant');
+
+                    currentTurn = result.turn;
+                    aiResponseTimestamp = result.timestamp;
+                    waitingForPartner = false;
+
+                    // Show appropriate UI based on role
+                    if (currentRole === 'interrogator') {
+                        // Show rating UI
+                        setupBinaryChoiceUI();
+                    } else {
+                        // Witness - enable message input
+                        chatInputContainer.style.display = 'flex';
+                        userMessageInput.disabled = false;
+                        sendMessageButton.disabled = false;
+                        userMessageInput.focus();
+                    }
+                }
+
+                // Check for partner dropout
+                if (result.partner_dropped) {
+                    clearInterval(partnerPollInterval);
+                    partnerPollInterval = null;
+                    handlePartnerDropout();
+                }
+
+            } catch (error) {
+                logToRailway({
+                    type: 'PARTNER_POLLING_ERROR',
+                    message: `Error polling for partner message: ${error.message}`
+                });
+            }
+        }, 2000); // Poll every 2 seconds
+    }
+
+    function handlePartnerDropout() {
+        logUiEvent('partner_dropped');
+
+        chatInputContainer.style.display = 'none';
+        assessmentAreaDiv.style.display = 'none';
+
+        const dropoutMessage = document.createElement('div');
+        dropoutMessage.style.cssText = 'text-align: center; padding: 40px; background: #f8d7da; border-radius: 5px; margin: 20px;';
+        dropoutMessage.innerHTML = `
+            <h3 style="color: #721c24;">Partner Disconnected</h3>
+            <p>Your conversation partner has disconnected.</p>
+            <p>The study has ended. You will still receive compensation for your time.</p>
+            <button onclick="window.location.href='${PROLIFIC_COMPLETION_URL}'" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                Complete Study
+            </button>
+        `;
+
+        messageList.appendChild(dropoutMessage);
+        scrollToBottom();
     }
 
     function addMessageToUI(text, sender) {
@@ -880,12 +1170,12 @@ Thank you again for your participation!
                 localStorage.setItem('sessionId', sessionId);
                 currentTurn = 0;
                 messageList.innerHTML = '';
-                
-                // Backend is now ready, set the flag and try to proceed
+
+                // Backend is now ready, set the flag
                 isBackendReady = true;
-                // After the backend is ready, we immediately check if we can proceed.
-                // This handles the case where the backend finishes *before* the user has clicked.
-                tryProceedToChat();
+
+                // NEW: Enter waiting room (handles both AI and human partner modes)
+                await enterWaitingRoom();
 
 
             } catch (error) {
@@ -914,6 +1204,24 @@ Thank you again for your participation!
     userMessageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             handleSendMessage();
+        }
+    });
+
+    // NEW: Waiting room button event listeners
+    enterWaitingRoomButton.addEventListener('click', () => {
+        logUiEvent('enter_waiting_room_clicked');
+        showMainPhase('waiting-room');
+        startMatchPolling();
+    });
+
+    leaveWaitingRoomButton.addEventListener('click', async () => {
+        logUiEvent('leave_waiting_room_clicked');
+
+        // Redirect to Prolific with timeout code
+        if (isProduction) {
+            window.location.href = PROLIFIC_TIMED_OUT_URL;
+        } else {
+            alert('DEV MODE: Would redirect to Prolific timeout URL');
         }
     });
 
@@ -1267,6 +1575,12 @@ Thank you again for your participation!
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
 
+        // Check if it's our turn (for human-human conversations)
+        if (waitingForPartner) {
+            showError("Please wait for your partner to respond first.");
+            return;
+        }
+
         addMessageToUI(messageText, 'user');
 
         userMessageInput.value = '';
@@ -1275,7 +1589,8 @@ Thank you again for your participation!
         chatInputContainer.style.display = 'none';
         assessmentAreaDiv.style.display = 'none';
 
-        const indicatorDelay = Math.random() * (7000 - 5000) + 5000;
+        // NEW: For witness role, no typing indicator (they're just sending to human)
+        const indicatorDelay = currentRole === 'witness' ? 0 : Math.random() * (7000 - 5000) + 5000;
         
         // Log to Railway only
         logToRailway({
@@ -1301,7 +1616,26 @@ Thank you again for your participation!
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
             typingIndicator.style.display = 'none';
 
-            // Process the successful response
+            // NEW: Check if this is a human partner conversation
+            if (result.human_partner) {
+                // Message routed to partner - now wait for their response
+                waitingForPartner = true;
+                currentTurn = result.turn;
+
+                if (currentRole === 'witness') {
+                    // Witness waits for interrogator
+                    addSystemMessage("Waiting for interrogator...");
+                } else {
+                    // Interrogator waits for witness
+                    addSystemMessage("Waiting for witness...");
+                }
+
+                // Start polling for partner's response
+                startPartnerResponsePolling();
+                return; // Exit early - don't process AI response
+            }
+
+            // AI response (normal flow)
             addMessageToUI(result.ai_response, 'assistant');
 
             // NEW: Add backend retry time and attempts to totals
