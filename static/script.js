@@ -571,6 +571,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         first_sender: firstMessageSender
                     });
 
+                    // Backend is ready now that real match is found
+                    isBackendReady = true;
+
                     // Brief delay to show "Match found!" message
                     waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
                     setTimeout(() => {
@@ -623,6 +626,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             clearInterval(timerInterval);
             waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
+
+            // Backend is ready now that "match" is found
+            isBackendReady = true;
+
             setTimeout(() => {
                 tryProceedToChat();
             }, 1500);
@@ -1180,8 +1187,8 @@ Thank you again for your participation!
                 currentTurn = 0;
                 messageList.innerHTML = '';
 
-                // Backend is now ready, set the flag
-                isBackendReady = true;
+                // NOTE: isBackendReady will be set to true AFTER match is found
+                // (either simulated match in AI mode or real match in human mode)
 
                 // NEW: Enter waiting room (handles both AI and human partner modes)
                 await enterWaitingRoom();
