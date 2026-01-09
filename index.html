@@ -315,6 +315,85 @@
             </div>
         </div>
 
+        <!-- NEW: Role Assignment Phase -->
+        <div id="role-assignment-phase" class="study-phase" style="display: none;">
+            <h2>Your Role</h2>
+
+            <div id="role-card" style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px; margin: 30px 0;">
+                <h1 id="assigned-role-title" style="font-size: 48px; margin: 20px 0; color: #007bff;">
+                    <!-- "INTERROGATOR" or "WITNESS" -->
+                </h1>
+            </div>
+
+            <div id="interrogator-instructions" style="display: none;">
+                <h3>Your Task</h3>
+                <p>You are the <strong>INTERROGATOR</strong>.</p>
+                <p>Your job is to determine if the witness is human or AI through conversation.</p>
+                <ul>
+                    <li>Ask questions to figure out if they're human or AI</li>
+                    <li>After each of their messages, you'll rate your confidence</li>
+                    <li>The conversation lasts 7 minutes and 30 seconds</li>
+                    <li>You will submit the final decision</li>
+                </ul>
+            </div>
+
+            <div id="witness-instructions" style="display: none;">
+                <h3>Your Task</h3>
+                <p>You are the <strong>WITNESS</strong>.</p>
+                <p>Your job is to convince the interrogator that you are human.</p>
+                <ul>
+                    <li>Respond naturally to their questions</li>
+                    <li>Be yourself - act like a human would</li>
+                    <li>The conversation lasts 7 minutes and 30 seconds</li>
+                    <li>The interrogator will be making the final decision</li>
+                </ul>
+            </div>
+
+            <button id="enter-waiting-room-button" class="cta-button">Enter Waiting Room</button>
+        </div>
+
+        <!-- NEW: Waiting Room Phase -->
+        <div id="waiting-room-phase" class="study-phase" style="display: none;">
+            <h2>Waiting Room</h2>
+
+            <div class="waiting-visual" style="text-align: center; margin: 40px 0;">
+                <!-- Two circles: one filled (you), one empty (waiting for partner) -->
+                <div style="display: flex; justify-content: center; gap: 40px; align-items: center;">
+                    <div class="participant-circle filled">
+                        <div class="circle-icon">✓</div>
+                        <p style="margin-top: 10px; font-size: 14px;">You</p>
+                    </div>
+                    <div class="connecting-line">- - -</div>
+                    <div class="participant-circle empty">
+                        <div class="circle-icon">?</div>
+                        <p style="margin-top: 10px; font-size: 14px;">Partner</p>
+                    </div>
+                </div>
+            </div>
+
+            <p id="waiting-status" style="text-align: center; font-size: 18px; margin: 20px 0;">
+                Waiting for a partner to join...
+            </p>
+
+            <p style="text-align: center; color: #666; margin-top: 20px; font-style: italic;">
+                ⚠️ <strong>Do not refresh this page</strong> or you may lose your spot
+            </p>
+
+            <p id="waiting-timer" style="text-align: center; margin-top: 30px; font-size: 16px; color: #555;">
+                Time waiting: <span id="elapsed-time" style="font-weight: bold;">0:00</span>
+            </p>
+
+            <div id="waiting-timeout-warning" style="display: none; text-align: center; margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 5px;">
+                <p style="color: #856404; margin-bottom: 15px;">
+                    <strong>We're having trouble finding a match.</strong><br>
+                    If this continues, please contact the researcher.
+                </p>
+                <button id="leave-waiting-room-button" style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                    Report Issue & Exit Study
+                </button>
+            </div>
+        </div>
+
        <!-- Chat Interface is now the main container for conversation and assessment -->
        <div id="chat-interface" class="study-phase" style="display: none;">
            <h3>Conversation</h3>
@@ -332,10 +411,12 @@
            <!-- Assessment Area is NOW INSIDE chat-interface -->
            <!-- It will be shown/hidden as needed -->
            <div id="assessment-area" style="display: none; margin-top:15px; padding-top:15px; border-top: 1px solid #eee;">
-            <h4>Your Assessment</h4>
+            <!-- Interrogator Rating UI -->
+            <div id="interrogator-rating-ui">
+                <h4>Your Assessment</h4>
 
-            <!-- Step 1: Binary Choice (Human/AI) -->
-            <div id="binary-choice-section">
+                <!-- Step 1: Binary Choice (Human/AI) -->
+                <div id="binary-choice-section">
                 <p><strong>What's your best guess right now?</strong></p>
                 <div id="binary-choice-buttons" style="display: flex; gap: 20px; justify-content: center; margin: 20px 0;">
                     <button id="choice-human-button" class="binary-choice-btn">Human</button>
@@ -365,6 +446,15 @@
                     <button id="submit-comment-button">Submit Comment</button>
                     <div id="comment-loading" class="loading-message" style="display: none;">Submitting comment...</div>
                 </div>
+            </div>
+            </div>
+
+            <!-- NEW: Witness Waiting UI (shown instead of rating UI for witnesses) -->
+            <div id="witness-waiting-ui" style="display: none; text-align: center; padding: 30px;">
+                <div class="loading-spinner" style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="font-size: 18px; margin-top: 20px; color: #555;">
+                    Waiting for interrogator to respond...
+                </p>
             </div>
         </div>
 
