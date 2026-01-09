@@ -585,3 +585,60 @@ button > * {
     justify-content: center;
     margin: 20px 0;
 }
+
+/* NEW: Waiting Room Styles */
+.waiting-visual {
+    margin: 40px auto;
+    max-width: 600px;
+}
+
+.participant-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.participant-circle.filled {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.participant-circle.empty {
+    background-color: #f8f9fa;
+    border-color: #ddd;
+    color: #999;
+}
+
+.circle-icon {
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.connecting-line {
+    font-size: 24px;
+    color: #ddd;
+    letter-spacing: 5px;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
