@@ -409,6 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // This function checks if both user and backend are ready, then proceeds
     function tryProceedToChat() {
+        logToRailway({
+            type: 'TRY_PROCEED_TO_CHAT',
+            message: 'tryProceedToChat called',
+            context: { isBackendReady, isUserReady }
+        });
+
         if (isBackendReady && isUserReady) {
             // Stop and hide the loading animation at the last possible moment
             clearInterval(progressInterval);
@@ -505,6 +511,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // NEW: Human witness mode functions
     async function enterWaitingRoom() {
+        logToRailway({
+            type: 'ENTER_WAITING_ROOM_CALLED',
+            message: 'enterWaitingRoom function called',
+            context: {}
+        });
         try {
             const response = await fetch('/enter_waiting_room', {
                 method: 'POST',
@@ -512,10 +523,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ session_id: sessionId })
             });
             const result = await response.json();
+            logToRailway({
+                type: 'ENTER_WAITING_ROOM_RESPONSE',
+                message: 'Received response from enter_waiting_room',
+                context: result
+            });
 
             // Both modes show role assignment first
             isHumanPartner = !result.ai_partner;
             currentRole = result.ai_partner ? 'interrogator' : result.role;
+            logToRailway({
+                type: 'ROLE_ASSIGNMENT_VARS',
+                message: 'Set role variables',
+                context: { isHumanPartner, currentRole }
+            });
             showRoleAssignment(currentRole);
         } catch (error) {
             logToRailway({
@@ -528,6 +549,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showRoleAssignment(role) {
+        logToRailway({
+            type: 'SHOW_ROLE_ASSIGNMENT',
+            message: 'showRoleAssignment called',
+            context: { role }
+        });
         showMainPhase('role-assignment');
 
         assignedRoleTitleSpan.textContent = role.toUpperCase();
@@ -628,7 +654,17 @@ document.addEventListener('DOMContentLoaded', () => {
             waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
 
             // Backend is ready now that "match" is found
+            logToRailway({
+                type: 'SIMULATED_MATCH_FOUND',
+                message: 'Simulated match found - setting isBackendReady to true',
+                context: { isBackendReady_before: isBackendReady, isUserReady }
+            });
             isBackendReady = true;
+            logToRailway({
+                type: 'FLAGS_AFTER_SIMULATED_MATCH',
+                message: 'Flags after setting isBackendReady',
+                context: { isBackendReady, isUserReady }
+            });
 
             setTimeout(() => {
                 tryProceedToChat();
@@ -1028,9 +1064,19 @@ Thank you again for your participation!
 
     finalInstructionsButton.addEventListener('click', () => {
         logUiEvent('final_instructions_understand_clicked');
+        logToRailway({
+            type: 'I_UNDERSTAND_CLICKED',
+            message: '"I understand" button clicked - setting isUserReady to true',
+            context: { isBackendReady_before: isBackendReady, isUserReady_before: isUserReady }
+        });
         // Hides the pop-up and sets the flag. That is its only job.
         finalInstructionsModal.style.display = 'none';
         isUserReady = true;
+        logToRailway({
+            type: 'FLAGS_AFTER_I_UNDERSTAND',
+            message: 'Flags after setting isUserReady',
+            context: { isBackendReady, isUserReady }
+        });
         // After the user is ready, we immediately check if we can proceed.
         // This handles the case where the user clicks *before* the backend is ready.
         tryProceedToChat();
@@ -1145,8 +1191,18 @@ Thank you again for your participation!
         // Reset state flags for this attempt
         isBackendReady = false;
         isUserReady = false;
-        
+        logToRailway({
+            type: 'FORM_SUBMITTED_FLAGS_RESET',
+            message: 'Form submitted - reset flags to false',
+            context: { isBackendReady, isUserReady }
+        });
+
         // Show the final instructions pop-up
+        logToRailway({
+            type: 'SHOWING_INSTRUCTIONS_MODAL',
+            message: 'Showing final instructions modal',
+            context: {}
+        });
         finalInstructionsModal.style.display = 'flex';
 
         // Show loading indicator and disable form button
@@ -1226,12 +1282,27 @@ Thank you again for your participation!
     // NEW: Waiting room button event listeners
     enterWaitingRoomButton.addEventListener('click', () => {
         logUiEvent('enter_waiting_room_clicked');
+        logToRailway({
+            type: 'ENTER_WAITING_ROOM_BUTTON_CLICKED',
+            message: '"Enter Waiting Room" button clicked',
+            context: { isHumanPartner }
+        });
         showMainPhase('waiting-room');
 
         if (isHumanPartner) {
+            logToRailway({
+                type: 'STARTING_REAL_MATCH_POLLING',
+                message: 'Starting real match polling (HUMAN_WITNESS mode)',
+                context: {}
+            });
             // HUMAN_WITNESS mode - actually poll for matches
             startMatchPolling();
         } else {
+            logToRailway({
+                type: 'STARTING_SIMULATED_MATCH',
+                message: 'Starting simulated match (AI_WITNESS mode)',
+                context: {}
+            });
             // AI_WITNESS mode - simulate finding a match after 5-10 seconds
             simulateAIMatch();
         }
