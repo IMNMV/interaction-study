@@ -513,23 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await response.json();
 
-            if (result.ai_partner) {
-                // AI_WITNESS mode - simulate waiting room for consistency
-                isHumanPartner = false;
-                currentRole = 'interrogator';
-                showRoleAssignment('interrogator');
-
-                // Simulate a brief wait (5-10 seconds) for consistency
-                const simulatedWaitTime = Math.random() * 5000 + 5000; // 5-10 seconds
-                setTimeout(() => {
-                    tryProceedToChat();
-                }, simulatedWaitTime);
-            } else {
-                // HUMAN_WITNESS mode - show role and waiting room
-                isHumanPartner = true;
-                currentRole = result.role;
-                showRoleAssignment(result.role);
-            }
+            // Both modes show role assignment first
+            isHumanPartner = !result.ai_partner;
+            currentRole = result.ai_partner ? 'interrogator' : result.role;
+            showRoleAssignment(currentRole);
         } catch (error) {
             logToRailway({
                 type: 'WAITING_ROOM_ERROR',
@@ -618,6 +605,28 @@ document.addEventListener('DOMContentLoaded', () => {
         waitingTimeoutWarningDiv.style.display = 'block';
 
         showError('No match found after 5 minutes. Please use the "Report Issue & Exit" button.');
+    }
+
+    function simulateAIMatch() {
+        // Simulate finding AI partner after 5-10 seconds
+        const simulatedWaitTime = Math.random() * 5000 + 5000; // 5-10 seconds
+
+        // Update elapsed time display during simulated wait
+        const startTime = Date.now();
+        const timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            elapsedTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+
+        setTimeout(() => {
+            clearInterval(timerInterval);
+            waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
+            setTimeout(() => {
+                tryProceedToChat();
+            }, 1500);
+        }, simulatedWaitTime);
     }
 
     function addSystemMessage(text) {
@@ -1211,7 +1220,14 @@ Thank you again for your participation!
     enterWaitingRoomButton.addEventListener('click', () => {
         logUiEvent('enter_waiting_room_clicked');
         showMainPhase('waiting-room');
-        startMatchPolling();
+
+        if (isHumanPartner) {
+            // HUMAN_WITNESS mode - actually poll for matches
+            startMatchPolling();
+        } else {
+            // AI_WITNESS mode - simulate finding a match after 5-10 seconds
+            simulateAIMatch();
+        }
     });
 
     leaveWaitingRoomButton.addEventListener('click', async () => {
