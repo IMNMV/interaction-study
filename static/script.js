@@ -730,6 +730,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     aiResponseTimestamp = result.timestamp;
                     waitingForPartner = false;
 
+                    // Hide typing indicator (important for clean UI)
+                    typingIndicator.style.display = 'none';
+
                     // Show appropriate UI based on role
                     if (currentRole === 'interrogator') {
                         // Show rating UI for interrogator
