@@ -1395,8 +1395,7 @@ Thank you again for your participation!
         });
         finalInstructionsModal.style.display = 'flex';
 
-        // Show loading indicator and disable form button
-        initLoadingDiv.style.display = 'flex';
+        // NO LOADING BAR - The waiting room IS the loading screen
         initialForm.querySelector('button').disabled = true;
         // Lock all demographics controls after capturing values
         setInitialFormControlsDisabled(true);
@@ -1404,18 +1403,6 @@ Thank you again for your participation!
         // This self-contained function handles the entire async process
         const performInitialization = async (payload) => {
             try {
-                // Start progress bar animation
-                const progressBar = document.getElementById('progress-bar');
-                if (progressBar) {
-                    progressBar.style.width = '0%';
-                    let currentProgress = 0;
-                    progressInterval = setInterval(() => {
-                        const increment = Math.random() * 5;
-                        currentProgress = Math.min(currentProgress + increment, 99);
-                        progressBar.style.width = currentProgress + '%';
-                    }, 800);
-                }
-
                 const response = await fetch('/initialize_study', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1444,8 +1431,6 @@ Thank you again for your participation!
                 // This block runs if any part of the 'try' block fails
                 // SILENT: Study initialization failure - Railway logs only
                 finalInstructionsModal.style.display = 'none';
-                initLoadingDiv.style.display = 'none';
-                clearInterval(progressInterval);
                 initialForm.querySelector('button').disabled = false;
                 // Unlock the form so the participant can correct inputs
                 setInitialFormControlsDisabled(false);
