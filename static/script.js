@@ -527,15 +527,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 context: result
             });
 
-            // Both modes show role assignment first
             isHumanPartner = !result.ai_partner;
-            currentRole = result.ai_partner ? 'interrogator' : result.role;
-            logToRailway({
-                type: 'ROLE_ASSIGNMENT_VARS',
-                message: 'Set role variables',
-                context: { isHumanPartner, currentRole }
-            });
-            showRoleAssignment(currentRole);
+
+            if (result.ai_partner) {
+                // AI mode - show role assignment as before
+                currentRole = 'interrogator';
+                logToRailway({
+                    type: 'ROLE_ASSIGNMENT_VARS',
+                    message: 'Set role variables (AI mode)',
+                    context: { isHumanPartner, currentRole }
+                });
+                showRoleAssignment(currentRole);
+            } else {
+                // Human mode - show generic ready screen (no role yet)
+                logToRailway({
+                    type: 'SHOW_READY_SCREEN',
+                    message: 'Showing generic ready screen (human mode)',
+                    context: { isHumanPartner }
+                });
+                showReadyToJoinScreen();
+            }
         } catch (error) {
             logToRailway({
                 type: 'WAITING_ROOM_ERROR',
@@ -543,6 +554,100 @@ document.addEventListener('DOMContentLoaded', () => {
                 context: { error: error }
             });
             showError('Failed to enter waiting room. Please refresh and try again.');
+        }
+    }
+
+    function showReadyToJoinScreen() {
+        // Show generic ready screen (for human mode - no role assigned yet)
+        showMainPhase('role-assignment'); // Reuse same phase
+        assignedRoleTitleSpan.textContent = 'READY TO JOIN';
+        // Hide both instruction sets
+        interrogatorInstructionsDiv.style.display = 'none';
+        witnessInstructionsDiv.style.display = 'none';
+        // Button text stays "Enter Waiting Room"
+    }
+
+    function showRoleInstructionsInWaitingRoom(role) {
+        // Show role-specific instructions INSIDE the waiting room
+        const instructionsDiv = document.getElementById('waiting-room-instructions');
+        const roleTitleSpan = document.getElementById('waiting-room-role-title');
+        const instructionsContent = document.getElementById('waiting-room-instructions-content');
+
+        roleTitleSpan.textContent = role.toUpperCase();
+
+        if (role === 'interrogator') {
+            instructionsContent.innerHTML = `
+                <p><strong>Your task:</strong> Have a conversation with your partner and decide if they are human or AI.</p>
+                <ul style="text-align: left; margin: 15px 0;">
+                    <li>You will start the conversation</li>
+                    <li>Ask questions to determine if your partner is human or AI</li>
+                    <li>After each message from your partner, you'll rate how human-like they seem</li>
+                    <li>The conversation will last for 15 message exchanges</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
+            `;
+        } else {
+            instructionsContent.innerHTML = `
+                <p><strong>Your task:</strong> Have a conversation with your partner and convince them you are human.</p>
+                <ul style="text-align: left; margin: 15px 0;">
+                    <li>Your partner will start the conversation</li>
+                    <li>Respond naturally to their questions</li>
+                    <li>Try to convince them you are human (even though you are!)</li>
+                    <li>Be yourself and chat naturally</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
+            `;
+        }
+
+        instructionsDiv.style.display = 'block';
+
+        logToRailway({
+            type: 'INSTRUCTIONS_SHOWN_IN_WAITING_ROOM',
+            message: 'Role instructions displayed in waiting room',
+            context: { role }
+        });
+    }
+
+    function enforceMinimumInstructionTime() {
+        // Ensure both participants have had at least 10 seconds to read instructions
+        const MINIMUM_INSTRUCTION_TIME = 10000; // 10 seconds in milliseconds
+        const now = Date.now();
+        const elapsedSinceInstructionsShown = now - (window.instructionsShownAt || now);
+        const remainingTime = MINIMUM_INSTRUCTION_TIME - elapsedSinceInstructionsShown;
+
+        if (remainingTime > 0) {
+            // Need to wait longer - update status message
+            const secondsRemaining = Math.ceil(remainingTime / 1000);
+            waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${secondsRemaining}s)...</span>`;
+
+            logToRailway({
+                type: 'ENFORCING_INSTRUCTION_MINIMUM',
+                message: 'Waiting for minimum instruction time before proceeding',
+                context: {
+                    elapsed_ms: elapsedSinceInstructionsShown,
+                    remaining_ms: remainingTime
+                }
+            });
+
+            // Wait the remaining time, then proceed
+            setTimeout(() => {
+                logToRailway({
+                    type: 'MINIMUM_INSTRUCTION_TIME_ELAPSED',
+                    message: '10-second minimum instruction time completed',
+                    context: { total_time_ms: Date.now() - window.instructionsShownAt }
+                });
+                tryProceedToChat();
+            }, remainingTime);
+        } else {
+            // Already waited long enough, proceed immediately
+            logToRailway({
+                type: 'MINIMUM_INSTRUCTION_TIME_ALREADY_ELAPSED',
+                message: 'Instructions shown for sufficient time, proceeding',
+                context: { elapsed_ms: elapsedSinceInstructionsShown }
+            });
+            setTimeout(() => {
+                tryProceedToChat();
+            }, 1500);
         }
     }
 
@@ -589,6 +694,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     partnerSessionId = result.partner_session_id;
                     firstMessageSender = result.first_message_sender;
 
+                    // Track when match was found
+                    window.matchFoundAt = Date.now();
+
                     logUiEvent('match_found', {
                         partner_id: partnerSessionId,
                         time_waiting: elapsed,
@@ -600,9 +708,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Brief delay to show "Match found!" message
                     waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
-                    setTimeout(() => {
-                        tryProceedToChat();
-                    }, 1500);
+
+                    // Enforce 10-second minimum before proceeding
+                    enforceMinimumInstructionTime();
                 }
 
                 // Show timeout warning after 4 minutes
@@ -1315,13 +1423,30 @@ Thank you again for your participation!
                 message: 'Starting real match polling (HUMAN_WITNESS mode)',
                 context: {}
             });
-            // Call backend to mark as waiting and attempt match
+            // Call backend to assign role + mark as waiting + attempt match
             try {
-                await fetch('/join_waiting_room', {
+                const response = await fetch('/join_waiting_room', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: sessionId })
                 });
+                const result = await response.json();
+
+                // NOW we have the role assigned
+                currentRole = result.role;
+
+                logToRailway({
+                    type: 'ROLE_ASSIGNED_IN_WAITING_ROOM',
+                    message: 'Role assigned atomically',
+                    context: { role: currentRole }
+                });
+
+                // Show role-specific instructions IN the waiting room
+                showRoleInstructionsInWaitingRoom(currentRole);
+
+                // Start 10-second minimum timer
+                window.instructionsShownAt = Date.now();
+
             } catch (error) {
                 logToRailway({
                     type: 'JOIN_WAITING_ROOM_ERROR',
