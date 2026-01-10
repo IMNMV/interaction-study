@@ -529,24 +529,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             isHumanPartner = !result.ai_partner;
 
+            // NEW FLOW: Don't show any intermediate screen
+            // Just set the mode flag and wait for "I understand" click
+            logToRailway({
+                type: 'MODE_DETERMINED',
+                message: 'Study mode determined, waiting for "I understand" click',
+                context: { isHumanPartner, ai_partner: result.ai_partner }
+            });
+
+            // For AI mode, set role now
             if (result.ai_partner) {
-                // AI mode - show role assignment as before
                 currentRole = 'interrogator';
-                logToRailway({
-                    type: 'ROLE_ASSIGNMENT_VARS',
-                    message: 'Set role variables (AI mode)',
-                    context: { isHumanPartner, currentRole }
-                });
-                showRoleAssignment(currentRole);
-            } else {
-                // Human mode - show generic ready screen (no role yet)
-                logToRailway({
-                    type: 'SHOW_READY_SCREEN',
-                    message: 'Showing generic ready screen (human mode)',
-                    context: { isHumanPartner }
-                });
-                showReadyToJoinScreen();
             }
+            // For human mode, role will be assigned when "I understand" is clicked
         } catch (error) {
             logToRailway({
                 type: 'WAITING_ROOM_ERROR',
@@ -608,42 +603,56 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function enforceMinimumInstructionTime() {
-        // Ensure both participants have had at least 10 seconds to read instructions
-        const MINIMUM_INSTRUCTION_TIME = 10000; // 10 seconds in milliseconds
+    function waitUntilProceedTime(proceedAtTimestamp) {
+        // DESIGN FIX: Both players wait until the same synchronized time
+        // Backend calculates: max(interrogator_entered, witness_entered) + 10 seconds
         const now = Date.now();
-        const elapsedSinceInstructionsShown = now - (window.instructionsShownAt || now);
-        const remainingTime = MINIMUM_INSTRUCTION_TIME - elapsedSinceInstructionsShown;
+        const proceedAtMs = proceedAtTimestamp * 1000; // Convert Unix timestamp (seconds) to milliseconds
+        const waitTimeMs = proceedAtMs - now;
 
-        if (remainingTime > 0) {
-            // Need to wait longer - update status message
-            const secondsRemaining = Math.ceil(remainingTime / 1000);
+        if (waitTimeMs > 0) {
+            const secondsRemaining = Math.ceil(waitTimeMs / 1000);
             waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${secondsRemaining}s)...</span>`;
 
             logToRailway({
-                type: 'ENFORCING_INSTRUCTION_MINIMUM',
-                message: 'Waiting for minimum instruction time before proceeding',
+                type: 'WAITING_FOR_SYNCHRONIZED_PROCEED',
+                message: 'Waiting for synchronized proceed time (both players >= 10s)',
                 context: {
-                    elapsed_ms: elapsedSinceInstructionsShown,
-                    remaining_ms: remainingTime
+                    proceed_at_timestamp: proceedAtTimestamp,
+                    wait_time_ms: waitTimeMs,
+                    seconds_remaining: secondsRemaining
                 }
             });
 
-            // Wait the remaining time, then proceed
+            // Update countdown every second
+            const countdownInterval = setInterval(() => {
+                const remaining = Math.ceil((proceedAtMs - Date.now()) / 1000);
+                if (remaining > 0) {
+                    waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${remaining}s)...</span>`;
+                } else {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+
+            // Wait until proceed time, then proceed
             setTimeout(() => {
+                clearInterval(countdownInterval);
                 logToRailway({
-                    type: 'MINIMUM_INSTRUCTION_TIME_ELAPSED',
-                    message: '10-second minimum instruction time completed',
-                    context: { total_time_ms: Date.now() - window.instructionsShownAt }
+                    type: 'SYNCHRONIZED_PROCEED_TIME_REACHED',
+                    message: 'Both players have had >=10s, proceeding to chat together',
+                    context: {
+                        instructions_shown_at: window.instructionsShownAt,
+                        total_wait_ms: Date.now() - window.instructionsShownAt
+                    }
                 });
                 tryProceedToChat();
-            }, remainingTime);
+            }, waitTimeMs);
         } else {
-            // Already waited long enough, proceed immediately
+            // Proceed time already passed (shouldn't happen, but handle it)
             logToRailway({
-                type: 'MINIMUM_INSTRUCTION_TIME_ALREADY_ELAPSED',
-                message: 'Instructions shown for sufficient time, proceeding',
-                context: { elapsed_ms: elapsedSinceInstructionsShown }
+                type: 'PROCEED_TIME_ALREADY_PASSED',
+                message: 'Proceed time already elapsed, proceeding immediately',
+                context: { wait_time_ms: waitTimeMs }
             });
             setTimeout(() => {
                 tryProceedToChat();
@@ -694,13 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     partnerSessionId = result.partner_session_id;
                     firstMessageSender = result.first_message_sender;
 
-                    // Track when match was found
-                    window.matchFoundAt = Date.now();
+                    // Get synchronized proceed time from backend (Unix timestamp in seconds)
+                    const proceedAtTimestamp = result.proceed_to_chat_at;
 
                     logUiEvent('match_found', {
                         partner_id: partnerSessionId,
                         time_waiting: elapsed,
-                        first_sender: firstMessageSender
+                        first_sender: firstMessageSender,
+                        proceed_at: proceedAtTimestamp
                     });
 
                     // Backend is ready now that real match is found
@@ -709,8 +719,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Brief delay to show "Match found!" message
                     waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
 
-                    // Enforce 10-second minimum before proceeding
-                    enforceMinimumInstructionTime();
+                    // DESIGN FIX: Wait until synchronized proceed time
+                    waitUntilProceedTime(proceedAtTimestamp);
                 }
 
                 // Show timeout warning after 4 minutes
@@ -1190,24 +1200,76 @@ Thank you again for your participation!
         showMainPhase('initial'); // Now, show the demographics page
     });
 
-    finalInstructionsButton.addEventListener('click', () => {
+    finalInstructionsButton.addEventListener('click', async () => {
         logUiEvent('final_instructions_understand_clicked');
         logToRailway({
             type: 'I_UNDERSTAND_CLICKED',
-            message: '"I understand" button clicked - setting isUserReady to true',
-            context: { isBackendReady_before: isBackendReady, isUserReady_before: isUserReady }
+            message: '"I understand" button clicked',
+            context: { isHumanPartner }
         });
-        // Hides the pop-up and sets the flag. That is its only job.
+
+        // Hide the modal
         finalInstructionsModal.style.display = 'none';
-        isUserReady = true;
-        logToRailway({
-            type: 'FLAGS_AFTER_I_UNDERSTAND',
-            message: 'Flags after setting isUserReady',
-            context: { isBackendReady, isUserReady }
-        });
-        // After the user is ready, we immediately check if we can proceed.
-        // This handles the case where the user clicks *before* the backend is ready.
-        tryProceedToChat();
+
+        if (isHumanPartner) {
+            // HUMAN MODE: Assign role + go to waiting room
+            try {
+                // Call backend to assign role atomically
+                const response = await fetch('/join_waiting_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to assign role');
+                }
+
+                // Role assigned
+                currentRole = result.role;
+
+                logToRailway({
+                    type: 'ROLE_ASSIGNED_ON_I_UNDERSTAND',
+                    message: 'Role assigned when "I understand" clicked',
+                    context: { role: currentRole }
+                });
+
+                // Go to waiting room immediately
+                showMainPhase('waiting-room');
+
+                // Show role instructions IN waiting room
+                showRoleInstructionsInWaitingRoom(currentRole);
+
+                // Start 10-second timer
+                window.instructionsShownAt = Date.now();
+
+                // Start polling for match automatically
+                startMatchPolling();
+
+            } catch (error) {
+                logToRailway({
+                    type: 'ROLE_ASSIGNMENT_ERROR',
+                    message: `Failed to assign role: ${error.message}`,
+                    context: { error: error }
+                });
+                showError('Failed to start matching. Please refresh and try again.');
+            }
+        } else {
+            // AI MODE: Set flags and proceed as before
+            isUserReady = true;
+            logToRailway({
+                type: 'AI_MODE_I_UNDERSTAND',
+                message: 'AI mode - setting isUserReady to true',
+                context: { isBackendReady, isUserReady }
+            });
+
+            // Show waiting room briefly before match
+            showMainPhase('waiting-room');
+
+            // Simulate finding AI partner
+            simulateAIMatch();
+        }
     });
     // --- Event Listeners ---
     // handleEarlyExit already declared above, no need to redeclare
@@ -1407,12 +1469,14 @@ Thank you again for your participation!
         }
     });
 
-    // NEW: Waiting room button event listeners
+    // OLD: "Enter Waiting Room" button - NO LONGER USED
+    // Role assignment now happens when "I understand" is clicked
+    // Keeping this for backward compatibility but should never be triggered
     enterWaitingRoomButton.addEventListener('click', async () => {
         logUiEvent('enter_waiting_room_clicked');
         logToRailway({
-            type: 'ENTER_WAITING_ROOM_BUTTON_CLICKED',
-            message: '"Enter Waiting Room" button clicked',
+            type: 'ENTER_WAITING_ROOM_BUTTON_CLICKED_LEGACY',
+            message: '⚠️ LEGACY: "Enter Waiting Room" button clicked (should not happen in new flow)',
             context: { isHumanPartner }
         });
         showMainPhase('waiting-room');
@@ -1432,6 +1496,10 @@ Thank you again for your participation!
                 });
                 const result = await response.json();
 
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to join waiting room');
+                }
+
                 // NOW we have the role assigned
                 currentRole = result.role;
 
@@ -1447,15 +1515,18 @@ Thank you again for your participation!
                 // Start 10-second minimum timer
                 window.instructionsShownAt = Date.now();
 
+                // FIXED BUG #1: Only start polling if role assignment succeeded
+                startMatchPolling();
+
             } catch (error) {
                 logToRailway({
                     type: 'JOIN_WAITING_ROOM_ERROR',
                     message: `Failed to join waiting room: ${error.message}`,
                     context: { error: error }
                 });
+                // TODO: Show error to user - for now, waiting room will appear frozen
+                showError('Failed to join waiting room. Please refresh and try again.');
             }
-            // HUMAN_WITNESS mode - actually poll for matches
-            startMatchPolling();
         } else {
             logToRailway({
                 type: 'STARTING_SIMULATED_MATCH',
