@@ -684,6 +684,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(partnerPollInterval);
         }
 
+        // Show typing bubbles while waiting for human partner
+        typingIndicator.style.display = 'flex';
+        scrollToBottom();
+
         // NEW: Track how long we've been waiting for partner
         const pollStartTime = Date.now();
         const PARTNER_TIMEOUT_MS = 120000; // 2 minutes
@@ -1724,10 +1728,10 @@ Thank you again for your participation!
         });
         
         setTimeout(() => {
-            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
-                // Start the typing animation - witness should see bubbles while interrogator rates
+            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none' && !isHumanPartner) {
+                // Start the typing animation (AI mode only)
                 animateTypingIndicator(messageText.length);
-                // Update timer message for State 1→2 transition (now waiting for response)
+                // Update timer message for State 1→2 transition (now waiting for AI response)
                 updateTimerMessage();
             }
         }, indicatorDelay);
