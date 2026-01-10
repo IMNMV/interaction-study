@@ -1724,10 +1724,10 @@ Thank you again for your participation!
         });
         
         setTimeout(() => {
-            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none' && !isHumanPartner) {
-                // Start the typing animation with periodic pauses (AI mode only)
+            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
+                // Start the typing animation - witness should see bubbles while interrogator rates
                 animateTypingIndicator(messageText.length);
-                // Update timer message for State 1→2 transition (now waiting for AI response)
+                // Update timer message for State 1→2 transition (now waiting for response)
                 updateTimerMessage();
             }
         }, indicatorDelay);
