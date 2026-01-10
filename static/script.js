@@ -1296,7 +1296,7 @@ Thank you again for your participation!
     });
 
     // NEW: Waiting room button event listeners
-    enterWaitingRoomButton.addEventListener('click', () => {
+    enterWaitingRoomButton.addEventListener('click', async () => {
         logUiEvent('enter_waiting_room_clicked');
         logToRailway({
             type: 'ENTER_WAITING_ROOM_BUTTON_CLICKED',
@@ -1311,6 +1311,20 @@ Thank you again for your participation!
                 message: 'Starting real match polling (HUMAN_WITNESS mode)',
                 context: {}
             });
+            // Call backend to mark as waiting and attempt match
+            try {
+                await fetch('/join_waiting_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+            } catch (error) {
+                logToRailway({
+                    type: 'JOIN_WAITING_ROOM_ERROR',
+                    message: `Failed to join waiting room: ${error.message}`,
+                    context: { error: error }
+                });
+            }
             // HUMAN_WITNESS mode - actually poll for matches
             startMatchPolling();
         } else {
@@ -1699,8 +1713,8 @@ Thank you again for your participation!
         chatInputContainer.style.display = 'none';
         assessmentAreaDiv.style.display = 'none';
 
-        // NEW: For witness role, no typing indicator (they're just sending to human)
-        const indicatorDelay = currentRole === 'witness' ? 0 : Math.random() * (7000 - 5000) + 5000;
+        // NEW: No typing indicator for human-human conversations (both roles)
+        const indicatorDelay = isHumanPartner ? 0 : Math.random() * (7000 - 5000) + 5000;
         
         // Log to Railway only
         logToRailway({
@@ -1710,8 +1724,8 @@ Thank you again for your participation!
         });
         
         setTimeout(() => {
-            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none') {
-                // Start the typing animation with periodic pauses
+            if (assessmentAreaDiv.style.display === 'none' && chatInputContainer.style.display === 'none' && !isHumanPartner) {
+                // Start the typing animation with periodic pauses (AI mode only)
                 animateTypingIndicator(messageText.length);
                 // Update timer message for State 1→2 transition (now waiting for AI response)
                 updateTimerMessage();
