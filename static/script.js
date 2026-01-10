@@ -445,7 +445,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     userMessageInput.disabled = true;
                     sendMessageButton.disabled = true;
                     waitingForPartner = true;
-                    addSystemMessage("Waiting for interrogator to send first message...");
                     startPartnerResponsePolling();
                 }
             } else {
@@ -460,11 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     sendMessageButton.disabled = false;
                     userMessageInput.focus();
                 } else {
-                    // Waiting for witness's first message
+                    // Waiting for witness's first message (shouldn't happen since interrogator always goes first)
                     userMessageInput.disabled = true;
                     sendMessageButton.disabled = true;
                     waitingForPartner = true;
-                    addSystemMessage("Waiting for witness to send first message...");
                     startPartnerResponsePolling();
                 }
             }
@@ -734,8 +732,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Show appropriate UI based on role
                     if (currentRole === 'interrogator') {
-                        // Show rating UI
-                        setupBinaryChoiceUI();
+                        // Show rating UI for interrogator
+                        assessmentAreaDiv.style.display = 'block';
+                        chatInputContainer.style.display = 'none';
+                        assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
+
+                        // Update timer message for rating phase
+                        updateTimerMessage();
+
+                        // Show binary choice section, hide confidence section
+                        binaryChoiceSection.style.display = 'block';
+                        confidenceSection.style.display = 'none';
+                        confidenceSlider.disabled = false;
+
+                        // Reset binary choice tracking for new turn
+                        binaryChoice = null;
+                        binaryChoiceStartTime = Date.now();
+                        binaryChoiceTime = null;
                     } else {
                         // Witness - enable message input
                         chatInputContainer.style.display = 'flex';
@@ -1715,14 +1728,6 @@ Thank you again for your participation!
                 // Message routed to partner - now wait for their response
                 waitingForPartner = true;
                 currentTurn = result.turn;
-
-                if (currentRole === 'witness') {
-                    // Witness waits for interrogator
-                    addSystemMessage("Waiting for interrogator...");
-                } else {
-                    // Interrogator waits for witness
-                    addSystemMessage("Waiting for witness...");
-                }
 
                 // Start polling for partner's response
                 startPartnerResponsePolling();
