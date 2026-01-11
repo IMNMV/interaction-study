@@ -1244,6 +1244,15 @@ Thank you again for your participation!
                 // Start 10-second timer
                 window.instructionsShownAt = Date.now();
 
+                // Set user as ready (they've read instructions and clicked "I understand")
+                isUserReady = true;
+
+                logToRailway({
+                    type: 'HUMAN_MODE_USER_READY',
+                    message: 'Human mode - setting isUserReady to true after instructions',
+                    context: { isBackendReady, isUserReady: true }
+                });
+
                 // Start polling for match automatically
                 startMatchPolling();
 
