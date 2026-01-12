@@ -1204,80 +1204,132 @@ Thank you again for your participation!
         logUiEvent('final_instructions_understand_clicked');
         logToRailway({
             type: 'I_UNDERSTAND_CLICKED',
-            message: '"I understand" button clicked',
-            context: { isHumanPartner }
+            message: '"I understand" button clicked - NOW starting initialization',
+            context: {}
         });
 
         // Hide the modal
         finalInstructionsModal.style.display = 'none';
 
-        if (isHumanPartner) {
-            // HUMAN MODE: Assign role + go to waiting room
-            try {
-                // Call backend to assign role atomically
-                const response = await fetch('/join_waiting_room', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                const result = await response.json();
+        // Get the pending form data
+        const data = window.pendingStudyData;
+        if (!data) {
+            showError('No form data found. Please refresh and try again.');
+            return;
+        }
 
-                if (!response.ok) {
-                    throw new Error(result.detail || 'Failed to assign role');
+        // NOW perform initialization (after user clicked "I understand")
+        try {
+            const response = await fetch('/initialize_study', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(getApiErrorMessage(result, 'Failed to initialize study.'));
+            }
+
+            // --- FULL, RESTORED SESSION SETUP LOGIC ---
+            sessionId = result.session_id;
+            localStorage.setItem('sessionId', sessionId);
+            currentTurn = 0;
+            messageList.innerHTML = '';
+
+            // Activate the early exit listener now that the study has officially begun
+            if (isProduction) {
+                window.addEventListener('beforeunload', handleEarlyExit);
+            }
+
+            // NOW enter waiting room (handles both AI and human partner modes)
+            await enterWaitingRoom();
+
+            // After enterWaitingRoom sets isHumanPartner, proceed with appropriate flow
+            if (isHumanPartner) {
+                // HUMAN MODE: Assign role + go to waiting room
+                try {
+                    // Call backend to assign role atomically
+                    const roleResponse = await fetch('/join_waiting_room', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                    const roleResult = await roleResponse.json();
+
+                    if (!roleResponse.ok) {
+                        throw new Error(roleResult.detail || 'Failed to assign role');
+                    }
+
+                    // Role assigned
+                    currentRole = roleResult.role;
+
+                    logToRailway({
+                        type: 'ROLE_ASSIGNED_ON_I_UNDERSTAND',
+                        message: 'Role assigned when "I understand" clicked',
+                        context: { role: currentRole }
+                    });
+
+                    // Go to waiting room immediately
+                    showMainPhase('waiting-room');
+
+                    // Show role instructions IN waiting room
+                    showRoleInstructionsInWaitingRoom(currentRole);
+
+                    // Start 10-second timer
+                    window.instructionsShownAt = Date.now();
+
+                    // Set user as ready (they've read instructions and clicked "I understand")
+                    isUserReady = true;
+
+                    logToRailway({
+                        type: 'HUMAN_MODE_USER_READY',
+                        message: 'Human mode - setting isUserReady to true after instructions',
+                        context: { isBackendReady, isUserReady: true }
+                    });
+
+                    // Start polling for match automatically
+                    startMatchPolling();
+
+                } catch (error) {
+                    logToRailway({
+                        type: 'ROLE_ASSIGNMENT_ERROR',
+                        message: `Failed to assign role: ${error.message}`,
+                        context: { error: error }
+                    });
+                    showError('Failed to start matching. Please refresh and try again.');
                 }
-
-                // Role assigned
-                currentRole = result.role;
+            } else {
+                // AI MODE: Set flags and proceed as before
+                isUserReady = true;
+                currentRole = 'interrogator';
 
                 logToRailway({
-                    type: 'ROLE_ASSIGNED_ON_I_UNDERSTAND',
-                    message: 'Role assigned when "I understand" clicked',
-                    context: { role: currentRole }
+                    type: 'AI_MODE_I_UNDERSTAND',
+                    message: 'AI mode - setting isUserReady to true',
+                    context: { isBackendReady, isUserReady }
                 });
 
-                // Go to waiting room immediately
+                // Show waiting room briefly before match
                 showMainPhase('waiting-room');
 
-                // Show role instructions IN waiting room
-                showRoleInstructionsInWaitingRoom(currentRole);
-
-                // Start 10-second timer
-                window.instructionsShownAt = Date.now();
-
-                // Set user as ready (they've read instructions and clicked "I understand")
-                isUserReady = true;
-
-                logToRailway({
-                    type: 'HUMAN_MODE_USER_READY',
-                    message: 'Human mode - setting isUserReady to true after instructions',
-                    context: { isBackendReady, isUserReady: true }
-                });
-
-                // Start polling for match automatically
-                startMatchPolling();
-
-            } catch (error) {
-                logToRailway({
-                    type: 'ROLE_ASSIGNMENT_ERROR',
-                    message: `Failed to assign role: ${error.message}`,
-                    context: { error: error }
-                });
-                showError('Failed to start matching. Please refresh and try again.');
+                // Simulate finding AI partner
+                simulateAIMatch();
             }
-        } else {
-            // AI MODE: Set flags and proceed as before
-            isUserReady = true;
+
+        } catch (error) {
+            // This block runs if any part of the 'try' block fails
             logToRailway({
-                type: 'AI_MODE_I_UNDERSTAND',
-                message: 'AI mode - setting isUserReady to true',
-                context: { isBackendReady, isUserReady }
+                type: 'INITIALIZATION_ERROR',
+                message: `Study initialization failed: ${error.message}`,
+                context: { error: error }
             });
-
-            // Show waiting room briefly before match
-            showMainPhase('waiting-room');
-
-            // Simulate finding AI partner
-            simulateAIMatch();
+            finalInstructionsModal.style.display = 'none';
+            const formButton = initialForm.querySelector('button');
+            if (formButton) formButton.disabled = false;
+            // Unlock the form so the participant can correct inputs
+            setInitialFormControlsDisabled(false);
+            showError('Failed to initialize study. Please refresh and try again.');
         }
     });
     // --- Event Listeners ---
@@ -1409,50 +1461,8 @@ Thank you again for your participation!
         // Lock all demographics controls after capturing values
         setInitialFormControlsDisabled(true);
 
-        // This self-contained function handles the entire async process
-        const performInitialization = async (payload) => {
-            try {
-                const response = await fetch('/initialize_study', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(getApiErrorMessage(result, 'Failed to initialize study.'));
-                }
-
-                // --- FULL, RESTORED SESSION SETUP LOGIC ---
-                sessionId = result.session_id;
-                localStorage.setItem('sessionId', sessionId);
-                currentTurn = 0;
-                messageList.innerHTML = '';
-
-                // NOTE: isBackendReady will be set to true AFTER match is found
-                // (either simulated match in AI mode or real match in human mode)
-
-                // NEW: Enter waiting room (handles both AI and human partner modes)
-                await enterWaitingRoom();
-
-
-            } catch (error) {
-                // This block runs if any part of the 'try' block fails
-                // SILENT: Study initialization failure - Railway logs only
-                finalInstructionsModal.style.display = 'none';
-                initialForm.querySelector('button').disabled = false;
-                // Unlock the form so the participant can correct inputs
-                setInitialFormControlsDisabled(false);
-            }
-        };
-
-        // Run the async function
-        performInitialization(data);
-
-        // 2. ACTIVATE the early exit listener now that the study has officially begun
-        if (isProduction) {
-            window.addEventListener('beforeunload', handleEarlyExit);
-        }
+        // Store the form data to be used when "I understand" is clicked
+        window.pendingStudyData = data;
     });
     
     // *** FIX: ADDING THE MISSING EVENT LISTENERS BACK ***
