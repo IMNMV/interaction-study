@@ -706,6 +706,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Get synchronized proceed time from backend (Unix timestamp in seconds)
                     const proceedAtTimestamp = result.proceed_to_chat_at;
 
+                    logToRailway({
+                        type: 'MATCH_FOUND_DEBUG',
+                        message: 'Match found - checking proceed_at_timestamp',
+                        context: {
+                            proceed_at_timestamp: proceedAtTimestamp,
+                            proceed_at_type: typeof proceedAtTimestamp,
+                            proceed_at_is_null: proceedAtTimestamp === null,
+                            proceed_at_is_undefined: proceedAtTimestamp === undefined,
+                            current_time_seconds: Date.now() / 1000
+                        }
+                    });
+
                     logUiEvent('match_found', {
                         partner_id: partnerSessionId,
                         time_waiting: elapsed,
@@ -720,7 +732,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     waitingStatusP.innerHTML = '<span style="color: #28a745; font-weight: bold;">Match found! Starting conversation...</span>';
 
                     // DESIGN FIX: Wait until synchronized proceed time
-                    waitUntilProceedTime(proceedAtTimestamp);
+                    if (proceedAtTimestamp && proceedAtTimestamp > 0) {
+                        waitUntilProceedTime(proceedAtTimestamp);
+                    } else {
+                        logToRailway({
+                            type: 'PROCEED_TIME_MISSING',
+                            message: 'proceed_to_chat_at is null/undefined - proceeding immediately (BUG!)',
+                            context: { proceed_at: proceedAtTimestamp }
+                        });
+                        // Fallback: proceed immediately (this is the bug!)
+                        tryProceedToChat();
+                    }
                 }
 
                 // Show timeout warning after 4 minutes
@@ -802,8 +824,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(partnerPollInterval);
         }
 
-        // Show typing bubbles while waiting for human partner
-        typingIndicator.style.display = 'flex';
+        // DON'T show typing bubbles for human partner (no fake indicators)
+        // In real implementation, backend would signal when partner actually starts typing
+        typingIndicator.style.display = 'none';
         scrollToBottom();
 
         // NEW: Track how long we've been waiting for partner
