@@ -1710,6 +1710,10 @@ Thank you again for your participation!
         // Reset confidence slider to 50% for new choice
         confidenceSlider.value = 50;
         confidenceValueSpan.textContent = '50';
+
+        // NEW: Hide slider thumb initially to avoid bias from previous round
+        confidenceSlider.classList.add('pristine');
+
         confidenceStartTime = Date.now(); // Start tracking confidence slider timing
         sliderInteractionLog = []; // Reset slider interaction log
         submitRatingButton.disabled = false; // Enable submit button
@@ -1717,6 +1721,9 @@ Thank you again for your participation!
 
     // NEW: Track when user first interacts with confidence slider
     confidenceSlider.addEventListener('mousedown', () => {
+        // Remove pristine class to show thumb on first interaction
+        confidenceSlider.classList.remove('pristine');
+
         const baseMs = tsToMs(aiResponseTimestamp);
         if (!confidenceStartTime && baseMs) {
             confidenceStartTime = Date.now();
@@ -1728,8 +1735,11 @@ Thank you again for your participation!
             });
         }
     });
-    
+
     confidenceSlider.addEventListener('touchstart', () => {
+        // Remove pristine class to show thumb on first interaction
+        confidenceSlider.classList.remove('pristine');
+
         const baseMs = tsToMs(aiResponseTimestamp);
         if (!confidenceStartTime && baseMs) {
             confidenceStartTime = Date.now();
