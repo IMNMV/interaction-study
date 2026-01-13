@@ -912,6 +912,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         binaryChoice = null;
                         binaryChoiceStartTime = Date.now();
                         binaryChoiceTime = null;
+                        binaryChoiceInProgress = false; // Reset double-click protection
+                        choiceHumanButton.disabled = false; // Re-enable buttons
+                        choiceAiButton.disabled = false;
                     } else {
                         // Witness - enable message input
                         chatInputContainer.style.display = 'flex';
@@ -1642,6 +1645,9 @@ Thank you again for your participation!
     // }
     // randomizeButtonOrder(); // Call this when assessment area is first shown
 
+    // NEW: Flag to prevent double-clicking binary choice buttons
+    let binaryChoiceInProgress = false;
+
     choiceHumanButton.addEventListener('click', () => {
         handleBinaryChoice('human');
     });
@@ -1651,6 +1657,27 @@ Thank you again for your participation!
     });
 
     function handleBinaryChoice(choice) {
+        // PROTECTION: Prevent double-clicking - only process first click
+        if (binaryChoiceInProgress) {
+            logToRailway({
+                type: 'BINARY_CHOICE_DOUBLE_CLICK_PREVENTED',
+                message: `Double-click prevented - already processing choice`,
+                context: {
+                    attempted_choice: choice,
+                    locked_choice: binaryChoice,
+                    turn: currentTurn
+                }
+            });
+            return; // Ignore subsequent clicks
+        }
+
+        // Lock immediately on first click
+        binaryChoiceInProgress = true;
+
+        // Disable both buttons immediately to prevent double-clicking
+        choiceHumanButton.disabled = true;
+        choiceAiButton.disabled = true;
+
         // Record the choice and timing
         binaryChoice = choice;
         binaryChoiceTime = Date.now() - binaryChoiceStartTime;
@@ -2073,6 +2100,9 @@ Thank you again for your participation!
             binaryChoice = null;
             binaryChoiceStartTime = Date.now(); // Start timing for binary choice
             binaryChoiceTime = null;
+            binaryChoiceInProgress = false; // Reset double-click protection
+            choiceHumanButton.disabled = false; // Re-enable buttons
+            choiceAiButton.disabled = false;
 
             // Reset timing variables for this turn
             confidenceStartTime = null;
