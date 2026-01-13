@@ -824,12 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(partnerPollInterval);
         }
 
-        // DON'T show typing bubbles for human partner (no fake indicators)
-        // In real implementation, backend would signal when partner actually starts typing
+        // Start with typing indicator hidden - will show when partner actually types
         typingIndicator.style.display = 'none';
         scrollToBottom();
 
-        // NEW: Track how long we've been waiting for partner
+        // Track how long we've been waiting for partner
         const pollStartTime = Date.now();
         const PARTNER_TIMEOUT_MS = 120000; // 2 minutes
 
@@ -851,8 +850,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const response = await fetch(`/check_partner_message?session_id=${sessionId}`);
-                const result = await response.json();
+                // Check for both typing status AND new messages in parallel
+                const [messageResponse, typingResponse] = await Promise.all([
+                    fetch(`/check_partner_message?session_id=${sessionId}`),
+                    fetch(`/check_partner_typing?session_id=${sessionId}`)
+                ]);
+
+                const result = await messageResponse.json();
+                const typingResult = await typingResponse.json();
+
+                // Update typing indicator based on partner's REAL typing status
+                if (typingResult.is_typing) {
+                    typingIndicator.style.display = 'flex';
+                    scrollToBottom();
+                } else {
+                    typingIndicator.style.display = 'none';
+                }
 
                 if (result.new_message) {
                     // NEW: Verify message is actually newer (prevent duplicates/out-of-order)
@@ -1494,6 +1507,35 @@ Thank you again for your participation!
         if (e.key === 'Enter') {
             handleSendMessage();
         }
+    });
+
+    // NEW: Real typing detection for human-human conversations
+    let typingSignalTimeout = null;
+    userMessageInput.addEventListener('input', () => {
+        // Only send typing signals in human partner mode
+        if (!isHumanPartner || !sessionId || waitingForPartner) {
+            return;
+        }
+
+        // Debounce: Send signal at most once per second
+        if (typingSignalTimeout) {
+            clearTimeout(typingSignalTimeout);
+        }
+
+        // Send typing signal
+        fetch('/signal_typing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+        }).catch(err => {
+            // Silent fail - typing indicators are not critical
+            console.log('Typing signal failed:', err);
+        });
+
+        // Set timeout to stop sending if user stops typing for 2 seconds
+        typingSignalTimeout = setTimeout(() => {
+            typingSignalTimeout = null;
+        }, 2000);
     });
 
     // OLD: "Enter Waiting Room" button - NO LONGER USED
