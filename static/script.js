@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const feedbackPhaseDiv = document.getElementById('feedback-phase');
     const submitFeedbackButton = document.getElementById('submit-feedback-button');
-    const skipFeedbackButton = document.getElementById('skip-feedback-button');
+    // const skipFeedbackButton = document.getElementById('skip-feedback-button'); // REMOVED: Feedback is now mandatory
     const feedbackTextarea = document.getElementById('feedback-textarea');
     const mainContainer = document.querySelector('.container'); // For the disagree message
 
@@ -829,12 +829,12 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollToBottom();
 
         // Track how long we've been waiting for partner
-        const pollStartTime = Date.now();
-        const PARTNER_TIMEOUT_MS = 120000; // 2 minutes
+        let lastActivityTime = Date.now();
+        const PARTNER_TIMEOUT_MS = 120000; // 2 minutes (resets if partner is typing, catches real dropouts)
 
         partnerPollInterval = setInterval(async () => {
-            // NEW: Check if partner has been inactive too long
-            const elapsedMs = Date.now() - pollStartTime;
+            // Check if partner has been inactive too long
+            const elapsedMs = Date.now() - lastActivityTime;
             if (elapsedMs >= PARTNER_TIMEOUT_MS) {
                 clearInterval(partnerPollInterval);
                 partnerPollInterval = null;
@@ -860,7 +860,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const typingResult = await typingResponse.json();
 
                 // Update typing indicator based on partner's REAL typing status
+                // IMPORTANT: If partner is typing, reset inactivity timer (they're still active!)
                 if (typingResult.is_typing) {
+                    lastActivityTime = Date.now(); // Reset timer - partner is active
                     typingIndicator.style.display = 'flex';
                     scrollToBottom();
                 } else {
@@ -1669,7 +1671,8 @@ Thank you again for your participation!
         confidenceSection.style.display = 'block';
         // Ensure slider is enabled for interaction on this step
         confidenceSlider.disabled = false;
-        chosenLabel.textContent = choice.charAt(0).toUpperCase() + choice.slice(1);
+        // Capitalize properly: "ai" → "AI", "human" → "Human"
+        chosenLabel.textContent = choice === 'ai' ? 'AI' : choice.charAt(0).toUpperCase() + choice.slice(1);
 
         // Reset confidence slider to 50% for new choice
         confidenceSlider.value = 50;
@@ -2279,40 +2282,41 @@ Thank you again for your participation!
 
     submitFeedbackButton.addEventListener('click', async () => {
         const commentText = feedbackTextarea.value.trim();
-        submitFeedbackButton.disabled = true;
-        skipFeedbackButton.disabled = true;
 
-        if (commentText) {
-            try {
-                // Send final comment to the correct endpoint
-                await fetch('/submit_final_comment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: sessionId,
-                        comment: commentText
-                    }),
-                });
-            } catch (error) {
-                // Log to Railway only
-                logToRailway({
-                    type: 'FEEDBACK_SUBMISSION_ERROR',
-                    message: error.message,
-                    stack: error.stack,
-                    context: { function: 'submitFeedbackButton' }
-                });
-            }
+        // Validate that feedback is provided (mandatory)
+        if (!commentText) {
+            showError('Please provide feedback about the conversation before continuing.');
+            return;
         }
+
+        submitFeedbackButton.disabled = true;
+
+        try {
+            // Send final comment to the correct endpoint
+            await fetch('/submit_final_comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    comment: commentText
+                }),
+            });
+        } catch (error) {
+            // Log to Railway only
+            logToRailway({
+                type: 'FEEDBACK_SUBMISSION_ERROR',
+                message: error.message,
+                stack: error.stack,
+                context: { function: 'submitFeedbackButton' }
+            });
+        }
+
         // Proceed to the final page
         showMainPhase('final');
         displayFinalPage(finalSummaryData);
     });
 
-    skipFeedbackButton.addEventListener('click', () => {
-        // Just proceed directly to the final page
-        showMainPhase('final');
-        displayFinalPage(finalSummaryData);
-    });
+    // Skip button removed - feedback is now mandatory for interrogators
 
     submitCommentButton.addEventListener('click', async () => {
         if (!sessionId) {
