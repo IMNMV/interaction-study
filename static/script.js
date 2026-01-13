@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isHumanPartner = false;
     let waitingForPartner = false;
     let matchCheckInterval = null;
+    let waitingTimerInterval = null; // NEW: Separate interval for waiting room timer
     let partnerPollInterval = null;
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
@@ -682,16 +683,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startMatchPolling() {
-        let elapsed = 0;
         const startTime = Date.now();
 
-        matchCheckInterval = setInterval(async () => {
-            elapsed = Math.floor((Date.now() - startTime) / 1000);
-
-            // Update timer display
+        // NEW: Separate timer update (runs every 1 second)
+        waitingTimerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
             const minutes = Math.floor(elapsed / 60);
             const seconds = elapsed % 60;
             elapsedTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000); // Update every 1 second
+
+        // Match checking (runs every 3 seconds)
+        matchCheckInterval = setInterval(async () => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
 
             // Check for match
             try {
@@ -700,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.matched) {
                     clearInterval(matchCheckInterval);
+                    clearInterval(waitingTimerInterval); // Stop timer updates
                     partnerSessionId = result.partner_session_id;
                     firstMessageSender = result.first_message_sender;
 
@@ -753,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Hard timeout after 5 minutes
                 if (elapsed >= 300) {
                     clearInterval(matchCheckInterval);
+                    clearInterval(waitingTimerInterval); // Stop timer updates
                     handleMatchTimeout();
                 }
             } catch (error) {
