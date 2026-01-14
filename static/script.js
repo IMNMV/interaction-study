@@ -88,9 +88,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const witnessEndMessage = document.getElementById('witness-end-message');
     const witnessEndContinueButton = document.getElementById('witness-end-continue-button');
 
-    // NEW: Interrogator connection issue modal
+    // NEW: Interrogator connection issue modal (human mode partner dropout)
     const interrogatorConnectionModal = document.getElementById('interrogator-connection-modal');
     const interrogatorConnectionContinueButton = document.getElementById('interrogator-connection-continue-button');
+
+    // NEW: AI connection failure modal (API retry failures)
+    const aiConnectionModal = document.getElementById('ai-connection-modal');
+    const aiConnectionTitle = document.getElementById('ai-connection-title');
+    const aiConnectionMessage = document.getElementById('ai-connection-message');
+    const aiConnectionButton = document.getElementById('ai-connection-button');
 
     // 1. Prolific Placeholder URLs
     const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=CR0KFVQO";
@@ -1405,6 +1411,43 @@ Thank you again for your participation!
         });
     });
 
+    // NEW: AI connection failure modal button - handles both scenarios
+    aiConnectionButton.addEventListener('click', () => {
+        const scenario = aiConnectionButton.dataset.scenario;
+
+        logUiEvent('ai_connection_modal_button_clicked', { scenario: scenario });
+
+        // Hide modal
+        aiConnectionModal.style.display = 'none';
+
+        if (scenario === 'end_study') {
+            // Scenario 2: Timer expired - end study, go to feedback form
+            // Clean up timer
+            if (studyTimer) {
+                clearInterval(studyTimer);
+            }
+            document.getElementById('timer-display').style.display = 'none';
+
+            // Go to feedback form
+            showMainPhase('feedback');
+
+            logToRailway({
+                type: 'AI_FAILURE_END_STUDY',
+                message: 'AI connection failed with timer expired - routing to feedback form',
+                context: { scenario: 'end_study' }
+            });
+
+        } else {
+            // Scenario 1: Time remaining - just dismiss, user can retry sending message
+            logToRailway({
+                type: 'AI_FAILURE_RETRY',
+                message: 'AI connection failed but time remaining - user can retry sending message',
+                context: { scenario: 'retry' }
+            });
+            // Chat input is already enabled from catch block - user can just send again
+        }
+    });
+
     confirmInstructionsButton.addEventListener('click', () => {
         logUiEvent('instructions_understand_clicked');
         // Show the modal pop-up instead of the next page
@@ -2330,17 +2373,40 @@ Thank you again for your participation!
                     final_error: true
                 }
             });
-            
-            // Hide typing indicator and reset UI - but keep conversation going
-            // The user can send another message to continue
+
+            // Hide typing indicator and reset UI
             typingIndicator.style.display = 'none';
             userMessageInput.disabled = false;
             sendMessageButton.disabled = false;
             chatInputContainer.style.display = 'flex';
             assessmentAreaDiv.style.display = 'none';
-            
-            // IMPORTANT: We don't show any error to the user
-            // They can just send another message and the conversation continues
+
+            // NEW: Show appropriate modal based on whether time expired
+            if (timeExpired) {
+                // Scenario 2: Timer expired - end study
+                aiConnectionMessage.textContent = "The connection between you and your partner failed. Click below to complete the study.";
+                aiConnectionButton.textContent = "Complete Study";
+                aiConnectionButton.dataset.scenario = "end_study";
+
+                logToRailway({
+                    type: 'AI_CONNECTION_FAILURE_TIME_EXPIRED',
+                    message: 'AI connection failed after timer expired - showing end study modal',
+                    context: { timeExpired: true }
+                });
+            } else {
+                // Scenario 1: Time remaining - allow retry
+                aiConnectionMessage.textContent = "Looks like the connection between you and your partner isn't stable. Try sending your message again, please.";
+                aiConnectionButton.textContent = "OK";
+                aiConnectionButton.dataset.scenario = "retry";
+
+                logToRailway({
+                    type: 'AI_CONNECTION_FAILURE_CAN_RETRY',
+                    message: 'AI connection failed with time remaining - showing retry modal',
+                    context: { timeExpired: false }
+                });
+            }
+
+            aiConnectionModal.style.display = 'flex';
         }
     }
 
