@@ -81,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const leaveWaitingRoomButton = document.getElementById('leave-waiting-room-button');
     const interrogatorRatingUI = document.getElementById('interrogator-rating-ui');
     const witnessWaitingUI = document.getElementById('witness-waiting-ui');
+    const witnessStyleNameSpan = document.getElementById('witness-style-name');
+    const witnessStyleDescriptionP = document.getElementById('witness-style-description');
 
     // NEW: Witness end-of-study modal
     const witnessEndModal = document.getElementById('witness-end-modal');
@@ -1523,6 +1525,21 @@ Thank you again for your participation!
 
                     // Role assigned
                     currentRole = roleResult.role;
+
+                    // NEW: If witness, populate social style instructions
+                    if (currentRole === 'witness' && roleResult.social_style) {
+                        witnessStyleNameSpan.textContent = roleResult.social_style;
+                        witnessStyleDescriptionP.textContent = roleResult.social_style_description;
+
+                        logToRailway({
+                            type: 'WITNESS_SOCIAL_STYLE_ASSIGNED',
+                            message: 'Witness assigned social style',
+                            context: {
+                                style: roleResult.social_style,
+                                description: roleResult.social_style_description
+                            }
+                        });
+                    }
 
                     logToRailway({
                         type: 'ROLE_ASSIGNED_ON_I_UNDERSTAND',
