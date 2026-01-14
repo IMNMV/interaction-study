@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Button text stays "Enter Waiting Room"
     }
 
-    function showRoleInstructionsInWaitingRoom(role) {
+    function showRoleInstructionsInWaitingRoom(role, socialStyle = null, socialStyleDescription = null) {
         // Show role-specific instructions INSIDE the waiting room
         const instructionsDiv = document.getElementById('waiting-room-instructions');
         const roleTitleSpan = document.getElementById('waiting-room-role-title');
@@ -652,13 +652,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
             `;
         } else {
+            // Witness instructions - include social style if provided
+            let styleSection = '';
+            if (socialStyle && socialStyleDescription) {
+                styleSection = `
+                    <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+                        <p style="margin: 0; font-weight: bold;">Your conversation style: ${socialStyle}</p>
+                        <p style="margin: 10px 0 0 0;">${socialStyleDescription}</p>
+                    </div>
+                `;
+            }
+
             instructionsContent.innerHTML = `
                 <p><strong>Your task:</strong> Have a conversation with your partner and convince them you are human.</p>
+                ${styleSection}
                 <ul style="text-align: left; margin: 15px 0;">
                     <li>Your partner will start the conversation</li>
                     <li>Respond naturally to their questions</li>
                     <li>Try to convince them you are human (even though you are!)</li>
-                    <li>Be yourself and chat naturally</li>
+                    ${socialStyle ? '<li>Follow the conversation style above</li>' : '<li>Be yourself and chat naturally</li>'}
                 </ul>
                 <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
             `;
@@ -669,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logToRailway({
             type: 'INSTRUCTIONS_SHOWN_IN_WAITING_ROOM',
             message: 'Role instructions displayed in waiting room',
-            context: { role }
+            context: { role, socialStyle }
         });
     }
 
@@ -1562,8 +1574,12 @@ Thank you again for your participation!
                     // Go to waiting room immediately
                     showMainPhase('waiting-room');
 
-                    // Show role instructions IN waiting room
-                    showRoleInstructionsInWaitingRoom(currentRole);
+                    // Show role instructions IN waiting room (with social style for witnesses)
+                    showRoleInstructionsInWaitingRoom(
+                        currentRole,
+                        roleResult.social_style,
+                        roleResult.social_style_description
+                    );
 
                     // Start 10-second timer
                     window.instructionsShownAt = Date.now();
@@ -1831,8 +1847,12 @@ Thank you again for your participation!
                     context: { role: currentRole }
                 });
 
-                // Show role-specific instructions IN the waiting room
-                showRoleInstructionsInWaitingRoom(currentRole);
+                // Show role-specific instructions IN the waiting room (with social style for witnesses)
+                showRoleInstructionsInWaitingRoom(
+                    currentRole,
+                    result.social_style,
+                    result.social_style_description
+                );
 
                 // Start 10-second minimum timer
                 window.instructionsShownAt = Date.now();
