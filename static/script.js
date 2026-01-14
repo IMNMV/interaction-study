@@ -2441,6 +2441,21 @@ Thank you again for your participation!
             return; // Should not happen due to UI flow, but safety check
         }
 
+        // NEW: Validate slider has been touched before submission
+        if (!confidenceStartTime || sliderInteractionLog.length === 0) {
+            showError('Please move the confidence slider before submitting.');
+            logToRailway({
+                type: 'SUBMIT_ERROR_NO_SLIDER_INTERACTION',
+                message: 'Submit attempt without slider interaction',
+                context: {
+                    turn: currentTurn,
+                    confidenceStartTime: confidenceStartTime,
+                    sliderInteractionLog_length: sliderInteractionLog.length
+                }
+            });
+            return;
+        }
+
         // NEW: For time expired, we no longer restrict confidence values
         // The binary choice (Human/AI) is the main decision, confidence is always 0-100%
 
