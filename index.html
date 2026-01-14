@@ -563,12 +563,21 @@
         </div>
     </div>
 
-    <!-- NEW: Interrogator connection issue modal -->
+    <!-- NEW: Interrogator connection issue modal (human mode partner dropout) -->
     <div id="interrogator-connection-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3 style="text-align: center; margin-top: 0;">Connection Issue</h3>
             <p style="text-align: center;">There was a connection issue with your partner. Please proceed to complete your final assessment of the conversation.</p>
             <button id="interrogator-connection-continue-button" style="margin: 20px auto; display: block;">Continue to Final Assessment</button>
+        </div>
+    </div>
+
+    <!-- NEW: AI connection failure modal (API retry failures) -->
+    <div id="ai-connection-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="ai-connection-title" style="text-align: center; margin-top: 0;">Connection Issue</h3>
+            <p id="ai-connection-message" style="text-align: center;"></p>
+            <button id="ai-connection-button" style="margin: 20px auto; display: block;"></button>
         </div>
     </div>
 
