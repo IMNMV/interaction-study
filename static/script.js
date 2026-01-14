@@ -48,7 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const researcherDataSection = document.getElementById('researcher-data-section');
 
     const consentPhaseDiv = document.getElementById('consent-phase');
-    const consentContentDiv = document.getElementById('consent-content');
+    const consentContentInterrogatorDiv = document.getElementById('consent-content-interrogator'); // NEW: Interrogator consent
+    const consentContentWitnessDiv = document.getElementById('consent-content-witness'); // NEW: Witness consent
     const consentActionsDiv = document.getElementById('consent-actions');
     const consentDownloadPromptDiv = document.getElementById('consent-download-prompt');
     const agreeButton = document.getElementById('agree-button');
@@ -180,10 +181,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END LIKERT BUBBLE HANDLERS ---
 
     // We generate a client-side ID for the consent form filename before the server gives us a session ID.
-    const participantId = self.crypto.randomUUID();
+    // CRITICAL: Must persist across page refreshes to maintain role assignment (IRB compliance)
+    let participantId = localStorage.getItem('participantId');
+    if (!participantId) {
+        participantId = self.crypto.randomUUID();
+        localStorage.setItem('participantId', participantId);
+    }
+
     // Try to compute prolificPid from URL parameters if present
     const urlParams = new URLSearchParams(window.location.search);
     const prolificPid = urlParams.get('PROLIFIC_PID') || urlParams.get('prolific_pid') || urlParams.get('prolificPID') || null;
+
+    // NEW: Pre-assigned role (assigned on page load, before consent)
+    let assignedRole = null; // 'interrogator' or 'witness'
+    let assignedSocialStyle = null; // Social style if witness (e.g., 'WARM', 'PLAYFUL')
+    let assignedSocialStyleDescription = null; // Description text
 
     let sessionId = null; // Changed from localStorage.getItem('sessionId') to ensure clean start
     let currentTurn = 0;
@@ -581,6 +593,64 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }, 0);
+    }
+
+    // NEW: Get or assign role on page load (BEFORE consent form)
+    async function getOrAssignRole() {
+        /**
+         * CRITICAL: Role assignment MUST happen on page load, BEFORE consent form.
+         * This ensures we show the correct consent form (interrogator vs witness).
+         * Role is PERMANENT for participant_id (IRB compliance).
+         */
+        logToRailway({
+            type: 'GET_OR_ASSIGN_ROLE_CALLED',
+            message: 'Calling /get_or_assign_role on page load',
+            context: { participantId, prolificPid }
+        });
+
+        try {
+            const response = await fetch('/get_or_assign_role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    participant_id: participantId,
+                    prolific_pid: prolificPid
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Role assignment failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            // Store assigned role and social style
+            assignedRole = result.role;
+            assignedSocialStyle = result.social_style || null;
+            assignedSocialStyleDescription = result.social_style_description || null;
+
+            logToRailway({
+                type: 'ROLE_ASSIGNED',
+                message: `Role assigned: ${assignedRole}`,
+                context: {
+                    role: assignedRole,
+                    social_style: assignedSocialStyle,
+                    is_existing: result.is_existing
+                }
+            });
+
+            return true;
+        } catch (error) {
+            logToRailway({
+                type: 'ROLE_ASSIGNMENT_ERROR',
+                message: 'Failed to assign role',
+                context: { error: error.message }
+            });
+
+            // Show error to user - this is critical for study flow
+            showError('Failed to assign role. Please refresh the page. If this persists, contact the researcher.');
+            return false;
+        }
     }
 
     // NEW: Human witness mode functions
@@ -1249,6 +1319,10 @@ document.addEventListener('DOMContentLoaded', () => {
         logUiEvent('consent_download_clicked');
         const timestamp = new Date().toLocaleString();
 
+        // NEW: Use role-specific consent text
+        const roleText = assignedRole === 'interrogator'
+            ? 'Your Role: Interrogator\n\nYour task: Determine if your partner is human or AI.\n- After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI.'
+            : 'Your Role: Witness\n\nYour task: Convince your partner that you are human.\n- Respond naturally to your partner\'s questions and messages.\n- You may be assigned a specific conversation style to follow during the interaction.';
 
         // If they want to download, generate the PDF and then move to the next phase.
         const consentText = `
@@ -1256,6 +1330,7 @@ CONSENT TO PARTICIPATE IN RESEARCH
 Title of Study: Interaction Study
 Participant ID: ${participantId}
 Prolific ID: ${prolificPid || 'N/A'}
+${roleText}
 
 [CONSENT RECORDED: Participant agreed to participate on ${timestamp}]
 
@@ -1268,8 +1343,6 @@ This research examines how people make judgments during conversational interacti
 What You Will Be Asked to Do
 If you agree to participate, you will:
 - Engage in a text-based conversation with a conversational partner.
-- After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI using a sliding scale (0 = definitely human, 1 = definitely AI).
-- Optionally provide brief comments about your experience during the conversation.
 - Complete a brief demographic questionnaire at the beginning.
 - The total time commitment will be approximately 10 minutes.
 - You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.
@@ -1747,7 +1820,10 @@ Thank you again for your participation!
             internet_usage_per_week: parseInt(internetUsageVal, 10),
             // Identifiers
             participant_id: participantId,
-            prolific_pid: prolificPid
+            prolific_pid: prolificPid,
+            // NEW: Pre-assigned role and social style (from /get_or_assign_role)
+            role: assignedRole,
+            social_style: assignedSocialStyle
         };
 
         // Reset state flags for this attempt
@@ -2847,7 +2923,35 @@ Thank you again for your participation!
     // NEW: Reset timing variables
     confidenceStartTime = null;
     sliderInteractionLog = [];
-    showMainPhase('consent'); // Start with the consent form instead of 'initial'
+
+    // NEW: CRITICAL - Assign role BEFORE showing consent form (IRB compliance)
+    // Role must be assigned first so we can show the correct consent form
+    (async () => {
+        const roleAssigned = await getOrAssignRole();
+        if (roleAssigned) {
+            // Role assigned successfully - show appropriate consent form
+            if (assignedRole === 'interrogator') {
+                consentContentInterrogatorDiv.style.display = 'block';
+                consentContentWitnessDiv.style.display = 'none';
+            } else if (assignedRole === 'witness') {
+                consentContentInterrogatorDiv.style.display = 'none';
+                consentContentWitnessDiv.style.display = 'block';
+            }
+
+            // Show the consent phase
+            showMainPhase('consent');
+
+            logToRailway({
+                type: 'CONSENT_FORM_SHOWN',
+                message: `Showing ${assignedRole} consent form`,
+                context: { role: assignedRole }
+            });
+        } else {
+            // Role assignment failed - error already shown to user
+            // Don't proceed to consent form
+        }
+    })();
+
     // Log page load event with basic metadata
     logUiEvent('page_load', {
         userAgent: navigator.userAgent,
