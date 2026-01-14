@@ -765,7 +765,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elapsedTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         }, 1000); // Update every 1 second
 
-        // Match checking (runs every 3 seconds)
+        // Match checking (runs every 1 second)
         matchCheckInterval = setInterval(async () => {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
 
@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     context: { elapsed_seconds: elapsed }
                 });
             }
-        }, 3000); // Poll every 3 seconds
+        }, 1000); // Poll every 1 second
     }
 
     function handleMatchTimeout() {
