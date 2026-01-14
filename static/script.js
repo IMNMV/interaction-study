@@ -1287,7 +1287,8 @@ document.addEventListener('DOMContentLoaded', () => {
     agreeButton.addEventListener('click', () => {
         logUiEvent('consent_agree_clicked');
         // When user agrees, hide the main text and buttons, and show the download prompt.
-        consentContentDiv.style.display = 'none';
+        consentContentInterrogatorDiv.style.display = 'none';
+        consentContentWitnessDiv.style.display = 'none';
         consentActionsDiv.style.display = 'none';
         consentDownloadPromptDiv.style.display = 'block';
     });
