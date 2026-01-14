@@ -366,13 +366,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update timer message based on current study state (called when time expired and state changes)
     function updateTimerMessage() {
         if (!timeExpired) return;
-        
+
         const timerDisplay = document.getElementById('timer-display');
         let timeExpiredMessage;
-        
+
         if (assessmentAreaDiv.style.display === 'block') {
-            // State 3: Rating phase - user needs to submit confidence rating
-            timeExpiredMessage = 'Time limit reached! Please make your final selection: 0 (Human) or 1 (AI)';
+            // State 3: Rating phase - check which phase of rating
+            if (binaryChoice === null) {
+                // On binary choice screen - need both choice and rating
+                timeExpiredMessage = "Time's up! Finish your choice and rating.";
+            } else {
+                // On confidence slider - just need rating
+                timeExpiredMessage = "Time's up! Finish your rating.";
+            }
         } else if (typingIndicator.style.display === 'flex') {
             // State 2: Waiting for AI response
             timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
@@ -380,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // State 1: Before sending message
             timeExpiredMessage = 'Time limit reached! Please send your message to receive your last response to judge.';
         }
-        
+
         timerDisplay.innerHTML = timeExpiredMessage;
     }
 
@@ -457,8 +463,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Set initial timer message and show message if in rating phase
                     updateTimerMessage();
                     if (assessmentAreaDiv.style.display === 'block') {
-                        // NEW: Updated message for binary choice system
-                        showError('Time expired! Please complete your final rating (binary choice + confidence) to finish the study.');
+                        // NEW: Dynamic message based on rating phase
+                        if (binaryChoice === null) {
+                            // On binary choice screen - need both choice and rating
+                            showError('Time expired! Please complete your Human/AI choice and confidence assessment to continue.');
+                        } else {
+                            // On confidence slider - just need rating
+                            showError('Time expired! Please complete your confidence assessment to continue.');
+                        }
                     }
                 }
             }
