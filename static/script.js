@@ -486,6 +486,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (isBackendReady && isUserReady) {
+            // Stop waiting room timer now that we're leaving
+            if (waitingTimerInterval) {
+                clearInterval(waitingTimerInterval);
+                waitingTimerInterval = null;
+            }
+
             // Stop and hide the loading animation at the last possible moment
             clearInterval(progressInterval);
             initLoadingDiv.style.display = 'none';
@@ -788,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.matched) {
                     clearInterval(matchCheckInterval);
-                    clearInterval(waitingTimerInterval); // Stop timer updates
+                    // DON'T stop waitingTimerInterval yet - let it keep counting until chat starts
                     partnerSessionId = result.partner_session_id;
                     firstMessageSender = result.first_message_sender;
 
