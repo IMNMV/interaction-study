@@ -342,10 +342,17 @@
                 <h3>Your Task</h3>
                 <p>You are the <strong>WITNESS</strong>.</p>
                 <p>Your job is to convince the interrogator that you are human.</p>
+
+                <!-- NEW: Social style instructions (populated by JavaScript) -->
+                <div id="witness-social-style" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+                    <p style="margin: 0; font-weight: bold;">Your conversation style: <span id="witness-style-name"></span></p>
+                    <p id="witness-style-description" style="margin: 10px 0 0 0;"></p>
+                </div>
+
                 <ul>
                     <li><strong>The interrogator will send the first message</strong></li>
                     <li>Respond naturally to their questions</li>
-                    <li>Be yourself - act like a human would</li>
+                    <li>Follow the conversation style above</li>
                     <li>The conversation lasts 7 minutes and 30 seconds</li>
                     <li>The interrogator will be making the final decision</li>
                 </ul>
@@ -531,8 +538,6 @@
             <p>In a moment you will see a conversation box. Your job is to decide if your conversational partner is a human, or an AI.</p>
             <p><em>Remember, if your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible. Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human.
                 You should consider each message sent by your conversation partner as evidence towards your judgment for that turn. You are free to chat as you would like.</em></p>
-
-            <p class="emphasis-line"><strong>You have been randomly selected to send the first message.</strong></p>
 
             <p><strong>After each message from your partner, you'll answer two questions:</strong></p>
             <ol>
