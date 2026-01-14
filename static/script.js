@@ -1475,21 +1475,33 @@ Thank you again for your participation!
         }
     });
 
-    // NEW: Witness modal continue button - route to debrief form
+    // NEW: Witness modal continue button - route to binary choice + comment + debrief
     witnessEndContinueButton.addEventListener('click', () => {
         logUiEvent('witness_modal_continue_clicked');
 
         // Hide modal
         witnessEndModal.style.display = 'none';
 
-        // Route witness to debrief form
-        showMainPhase('final');
-        debriefPhaseDiv.style.display = 'block';
-        summaryPhaseDiv.style.display = 'none';
+        // NEW: Show binary choice UI for witness (same as interrogator but no confidence slider)
+        // Witness needs to make final judgment: was partner human or AI?
+        showMainPhase('chat_and_assessment_flow');
+        chatInterfaceDiv.style.display = 'none';  // Hide chat
+        assessmentAreaDiv.style.display = 'block';  // Show assessment
+
+        // Reset binary choice state
+        binaryChoice = null;
+        binaryChoiceStartTime = Date.now();
+
+        // Show binary choice buttons
+        document.getElementById('binary-choice-area').style.display = 'block';
+        document.getElementById('confidence-slider-area').style.display = 'none';
+
+        // Update prompt for witness
+        document.getElementById('binary-choice-prompt').textContent = 'Based on your conversation, do you think your partner was:';
 
         logToRailway({
-            type: 'WITNESS_ROUTED_TO_DEBRIEF',
-            message: 'Witness clicked continue on modal - routing to debrief form',
+            type: 'WITNESS_BINARY_CHOICE_SHOWN',
+            message: 'Witness routing to binary choice + comment before debrief',
             context: { role: currentRole }
         });
     });
@@ -2040,10 +2052,36 @@ Thank you again for your participation!
             context: {
                 choice: choice,
                 time_taken_ms: binaryChoiceTime,
-                turn: currentTurn
+                turn: currentTurn,
+                role: currentRole
             }
         });
 
+        // NEW: Check if witness - if so, skip confidence slider and go to comment
+        if (currentRole === 'witness') {
+            // Witness: Skip confidence slider, show comment box
+            logToRailway({
+                type: 'WITNESS_SKIPPING_TO_COMMENT',
+                message: 'Witness selected binary choice, routing to comment box',
+                context: { choice: choice }
+            });
+
+            // Hide assessment area
+            assessmentAreaDiv.style.display = 'none';
+
+            // Show feedback phase for comment
+            showMainPhase('feedback');
+            feedbackTextarea.focus();
+
+            // Re-enable binary choice for next time (if needed)
+            binaryChoiceInProgress = false;
+            choiceHumanButton.disabled = false;
+            choiceAiButton.disabled = false;
+
+            return; // Skip confidence slider
+        }
+
+        // INTERROGATOR: Show confidence slider
         // Hide binary choice, show confidence slider
         binaryChoiceSection.style.display = 'none';
         confidenceSection.style.display = 'block';
@@ -2749,13 +2787,21 @@ Thank you again for your participation!
 
         try {
             // Send final comment to the correct endpoint
+            // NEW: Include binary choice for witnesses
+            const payload = {
+                session_id: sessionId,
+                comment: commentText
+            };
+
+            // If witness, include their binary choice
+            if (currentRole === 'witness' && binaryChoice) {
+                payload.binary_choice = binaryChoice;
+            }
+
             await fetch('/submit_final_comment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    comment: commentText
-                }),
+                body: JSON.stringify(payload),
             });
         } catch (error) {
             // Log to Railway only
@@ -2767,9 +2813,23 @@ Thank you again for your participation!
             });
         }
 
-        // Proceed to the final page
-        showMainPhase('final');
-        displayFinalPage(finalSummaryData);
+        // NEW: Check if witness - route to debrief instead of summary
+        if (currentRole === 'witness') {
+            // Witness: Go straight to debrief form
+            showMainPhase('final');
+            debriefPhaseDiv.style.display = 'block';
+            summaryPhaseDiv.style.display = 'none';
+
+            logToRailway({
+                type: 'WITNESS_ROUTED_TO_DEBRIEF_AFTER_COMMENT',
+                message: 'Witness submitted comment, routing to debrief',
+                context: { role: currentRole }
+            });
+        } else {
+            // Interrogator: Proceed to summary page
+            showMainPhase('final');
+            displayFinalPage(finalSummaryData);
+        }
     });
 
     // Skip button removed - feedback is now mandatory for interrogators
