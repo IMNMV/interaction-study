@@ -82,6 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const interrogatorRatingUI = document.getElementById('interrogator-rating-ui');
     const witnessWaitingUI = document.getElementById('witness-waiting-ui');
 
+    // NEW: Witness end-of-study modal
+    const witnessEndModal = document.getElementById('witness-end-modal');
+    const witnessEndTitle = document.getElementById('witness-end-title');
+    const witnessEndMessage = document.getElementById('witness-end-message');
+    const witnessEndContinueButton = document.getElementById('witness-end-continue-button');
+
+    // NEW: Interrogator connection issue modal
+    const interrogatorConnectionModal = document.getElementById('interrogator-connection-modal');
+    const interrogatorConnectionContinueButton = document.getElementById('interrogator-connection-continue-button');
+
     // 1. Prolific Placeholder URLs
     const PROLIFIC_COMPLETION_URL = "https://app.prolific.com/submissions/complete?cc=CR0KFVQO";
     const PROLIFIC_REJECTION_URL = "https://app.prolific.com/submissions/complete?cc=C120SCQ9";
@@ -202,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRole = null;  // 'interrogator' or 'witness'
     let partnerSessionId = null;
     let firstMessageSender = null;
+    let partnerDroppedFlag = false;  // Track when partner has dropped (for interrogator delayed handling)
     let isHumanPartner = false;
     let waitingForPartner = false;
     let matchCheckInterval = null;
@@ -411,11 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
 
-                // NEW: Handle timer expiry for witnesses (route to debrief)
+                // NEW: Handle timer expiry for witnesses (show modal)
                 if (currentRole === 'witness') {
                     logToRailway({
                         type: 'WITNESS_TIMER_EXPIRED',
-                        message: 'Timer expired for witness - routing to debrief form',
+                        message: 'Timer expired for witness - showing modal',
                         context: { role: currentRole }
                     });
 
@@ -429,10 +440,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     chatInputContainer.style.display = 'none';
                     timerDisplay.style.display = 'none';
 
-                    // Route witness directly to debrief form
-                    showMainPhase('final');
-                    debriefPhaseDiv.style.display = 'block';
-                    summaryPhaseDiv.style.display = 'none';
+                    // Show modal explaining time is up
+                    witnessEndTitle.textContent = 'Time Expired';
+                    witnessEndMessage.textContent = 'The conversation time limit has been reached. Thank you for your participation!';
+                    witnessEndModal.style.display = 'flex';
                 } else {
                     // Interrogator flow - existing logic
                     // Set initial timer message and show message if in rating phase
@@ -1006,57 +1017,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         document.getElementById('timer-display').style.display = 'none';
 
-        chatInputContainer.style.display = 'none';
-        assessmentAreaDiv.style.display = 'none';
-
         // Stop partner polling
         if (partnerPollInterval) {
             clearInterval(partnerPollInterval);
             partnerPollInterval = null;
         }
 
-        // NEW: Route witness to debrief form instead of directly to Prolific
-        logToRailway({
-            type: 'WITNESS_ROUTING_TO_DEBRIEF',
-            message: 'Witness being routed to debrief form after interrogator completed study',
-            context: { role: currentRole }
-        });
+        // NEW: Only witnesses should see this (interrogator completed)
+        if (currentRole === 'witness') {
+            chatInputContainer.style.display = 'none';
+            assessmentAreaDiv.style.display = 'none';
 
-        // Show debrief form (skip feedback phase - that's only for interrogators)
-        showMainPhase('final');
-        debriefPhaseDiv.style.display = 'block';
-        summaryPhaseDiv.style.display = 'none';
+            logToRailway({
+                type: 'WITNESS_SEES_PARTNER_COMPLETED',
+                message: 'Witness shown modal - interrogator completed study',
+                context: { role: currentRole }
+            });
+
+            // Show modal explaining what happened
+            witnessEndTitle.textContent = 'Study Complete';
+            witnessEndMessage.textContent = 'Your conversation partner has finished the study. Thank you for your participation!';
+            witnessEndModal.style.display = 'flex';
+        } else {
+            // This shouldn't happen for interrogators (they trigger their own completion)
+            logToRailway({
+                type: 'UNEXPECTED_STUDY_COMPLETED_FOR_INTERROGATOR',
+                message: 'WARNING: Interrogator received study_completed signal - should not happen',
+                context: { role: currentRole }
+            });
+        }
     }
 
     function handlePartnerDropout() {
         logUiEvent('partner_dropped');
 
-        // Clean up timer
-        if (studyTimer) {
-            clearInterval(studyTimer);
-        }
-        document.getElementById('timer-display').style.display = 'none';
-
-        chatInputContainer.style.display = 'none';
-        assessmentAreaDiv.style.display = 'none';
-
         // Stop partner polling
         if (partnerPollInterval) {
             clearInterval(partnerPollInterval);
             partnerPollInterval = null;
         }
 
-        // NEW: Route witness to debrief form instead of directly to Prolific
-        logToRailway({
-            type: 'WITNESS_ROUTING_TO_DEBRIEF_AFTER_DROPOUT',
-            message: 'Witness being routed to debrief form after partner dropped out',
-            context: { role: currentRole }
-        });
+        // NEW: Different handling based on role
+        if (currentRole === 'witness') {
+            // WITNESS: Show modal immediately - their study is over
+            // Clean up timer
+            if (studyTimer) {
+                clearInterval(studyTimer);
+            }
+            document.getElementById('timer-display').style.display = 'none';
 
-        // Show debrief form (skip feedback phase - that's only for interrogators)
-        showMainPhase('final');
-        debriefPhaseDiv.style.display = 'block';
-        summaryPhaseDiv.style.display = 'none';
+            chatInputContainer.style.display = 'none';
+            assessmentAreaDiv.style.display = 'none';
+
+            logToRailway({
+                type: 'WITNESS_SEES_PARTNER_DROPOUT',
+                message: 'Witness shown modal immediately - partner was inactive/dropped',
+                context: { role: currentRole }
+            });
+
+            // Show modal explaining what happened
+            witnessEndTitle.textContent = 'Study Ended';
+            witnessEndMessage.textContent = 'Your conversation partner was inactive for too long. The study has ended. Thank you for your participation!';
+            witnessEndModal.style.display = 'flex';
+
+        } else {
+            // INTERROGATOR: Set flag only - modal shown later when they try to interact
+            partnerDroppedFlag = true;
+
+            logToRailway({
+                type: 'INTERROGATOR_PARTNER_DROPPED_FLAG_SET',
+                message: 'Partner dropped - flag set, will show modal when interrogator tries to send message or finishes rating',
+                context: { role: currentRole }
+            });
+
+            // Don't show modal yet - they might be in middle of rating or typing
+            // Modal will show when they try to send message or after they submit rating
+        }
     }
 
     function addMessageToUI(text, sender) {
@@ -1325,6 +1361,48 @@ Thank you again for your participation!
             // For local testing, just proceed to the summary page
             showSummaryPhase();
         }
+    });
+
+    // NEW: Witness modal continue button - route to debrief form
+    witnessEndContinueButton.addEventListener('click', () => {
+        logUiEvent('witness_modal_continue_clicked');
+
+        // Hide modal
+        witnessEndModal.style.display = 'none';
+
+        // Route witness to debrief form
+        showMainPhase('final');
+        debriefPhaseDiv.style.display = 'block';
+        summaryPhaseDiv.style.display = 'none';
+
+        logToRailway({
+            type: 'WITNESS_ROUTED_TO_DEBRIEF',
+            message: 'Witness clicked continue on modal - routing to debrief form',
+            context: { role: currentRole }
+        });
+    });
+
+    // NEW: Interrogator connection issue modal continue button - proceed to feedback form
+    interrogatorConnectionContinueButton.addEventListener('click', () => {
+        logUiEvent('interrogator_connection_modal_continue_clicked');
+
+        // Hide modal
+        interrogatorConnectionModal.style.display = 'none';
+
+        // Clean up timer
+        if (studyTimer) {
+            clearInterval(studyTimer);
+        }
+        document.getElementById('timer-display').style.display = 'none';
+
+        // Go directly to feedback form (skip rating - no new response to evaluate)
+        showMainPhase('feedback');
+
+        logToRailway({
+            type: 'INTERROGATOR_PROCEEDED_TO_FEEDBACK',
+            message: 'Interrogator clicked continue on connection modal - showing feedback form',
+            context: { role: currentRole }
+        });
     });
 
     confirmInstructionsButton.addEventListener('click', () => {
@@ -2106,6 +2184,19 @@ Thank you again for your participation!
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
 
+        // NEW: Check if partner has dropped - show modal instead of sending
+        if (partnerDroppedFlag) {
+            logToRailway({
+                type: 'INTERROGATOR_TRIED_TO_SEND_AFTER_DROPOUT',
+                message: 'Interrogator tried to send message after partner dropped - showing connection modal',
+                context: { role: currentRole }
+            });
+
+            // Show connection issue modal
+            interrogatorConnectionModal.style.display = 'flex';
+            return; // Don't send the message
+        }
+
         // Check if it's our turn (for human-human conversations)
         if (waitingForPartner) {
             showError("Please wait for your partner to respond first.");
@@ -2380,7 +2471,21 @@ Thank you again for your participation!
                     finalSummaryData = result.session_data_summary; // Store data
                     showMainPhase('feedback'); // Go to feedback phase first
                 } else {
-                    if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() !== '') {
+                    // NEW: Check if partner has dropped after rating submission
+                    if (partnerDroppedFlag) {
+                        logToRailway({
+                            type: 'INTERROGATOR_FINISHED_RATING_AFTER_DROPOUT',
+                            message: 'Interrogator finished rating after partner dropped - showing connection modal',
+                            context: { role: currentRole }
+                        });
+
+                        // Hide rating UI
+                        assessmentAreaDiv.style.display = 'none';
+
+                        // Show connection issue modal
+                        interrogatorConnectionModal.style.display = 'flex';
+
+                    } else if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() !== '') {
                         assessmentAreaDiv.querySelector('h4').textContent = "Rating Submitted. Now, please submit your comment:";
                         submitRatingButton.style.display = 'none';
                         confidenceSlider.style.display = 'none';
@@ -2398,7 +2503,7 @@ Thank you again for your participation!
                         userMessageInput.disabled = false;
                         sendMessageButton.disabled = false;
                         userMessageInput.focus();
-                        
+
                         // Update timer message for State 3→1 transition (back to chat input)
                         updateTimerMessage();
                     }
