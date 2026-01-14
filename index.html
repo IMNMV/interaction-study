@@ -17,29 +17,32 @@
 
     <div class="container">
 
-        <!-- NEW: Consent Form Section -->
+        <!-- NEW: Consent Form Section (Role-Specific) -->
         <div id="consent-phase" class="study-phase" style="display: none;">
-            <div id="consent-content">
+            <!-- INTERROGATOR CONSENT FORM -->
+            <div id="consent-content-interrogator" style="display: none;">
                  <h2 style="text-align: center;">Consent to Participate in Research</h2>
                  <h3 style="text-align: center;">Title of Study: Interaction Study</h3>
+                 <p style="text-align: center; font-weight: bold; color: #007bff;">Your Role: Interrogator</p>
 
                  <h4>About this Study</h4>
                  <p>You are being asked to participate in a research study. This form provides you with information about the study.</p>
- 
+
                  <h4>Purpose of Research</h4>
                  <p>This research examines how people make judgments during conversational interactions and how these judgments change over time.</p>
- 
+
                  <h4>What You Will Be Asked to Do</h4>
                  <p>If you agree to participate, you will:</p>
                  <ul>
                      <li>Engage in a text-based conversation with a conversational partner.</li>
-                     <li>After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI using a sliding scale (0 = definitely human, 1 = definitely AI).</li>
+                     <li><strong>Your task: Determine if your partner is human or AI.</strong></li>
+                     <li>After each message exchange, rate your confidence about whether you believe you are talking to a human or an AI.</li>
                      <li>Optionally provide brief comments about your experience during the conversation.</li>
                      <li>Complete a brief demographic questionnaire at the beginning.</li>
                      <li>The total time commitment will be approximately 10 minutes.</li>
                      <li>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</li>
                  </ul>
- 
+
                  <h4>Your Rights as a Participant</h4>
                  <ul>
                      <li>Your participation is voluntary.</li>
@@ -47,7 +50,7 @@
                      <li>You may choose not to answer any question.</li>
                      <li>You may not be told everything about the purpose of this research study initially, but you will be fully informed after completion.</li>
                  </ul>
- 
+
                  <h4>Risks and Benefits</h4>
                  <ul>
                      <li>There are no known risks associated with participating in this study beyond those encountered in normal daily conversation.</li>
@@ -58,7 +61,7 @@
                  <ul>
                     <li>You will receive compensation equivalent to $8.00 per hour for your participation through the online platform.</li>
                  </ul>
- 
+
                  <h4>Confidentiality</h4>
                  <ul>
                     <li>Your responses will be stored securely.</li>
@@ -74,22 +77,91 @@
                     <li>For questions about the research: Contact the Principal Investigator at nvitali@fas.harvard.edu</li>
                     <li>For questions about your rights as a participant: Contact cuhs@harvard.edu</li>
                  </ul>
-                 
+
                  <h4>Agreement to Participate</h4>
                  <p>By clicking "I agree" below, you indicate that:</p>
                  <ul>
                     <li>You are at least 18 years old.</li>
                     <li>You have read and understood this consent form.</li>
-                    <li>You voluntarily agree to participate.</li>
+                    <li>You voluntarily agree to participate as an interrogator.</li>
                     <li>You understand you can withdraw at any time.</li>
                  </ul>
             </div>
-            
+
+            <!-- WITNESS CONSENT FORM -->
+            <div id="consent-content-witness" style="display: none;">
+                 <h2 style="text-align: center;">Consent to Participate in Research</h2>
+                 <h3 style="text-align: center;">Title of Study: Interaction Study</h3>
+                 <p style="text-align: center; font-weight: bold; color: #28a745;">Your Role: Witness</p>
+
+                 <h4>About this Study</h4>
+                 <p>You are being asked to participate in a research study. This form provides you with information about the study.</p>
+
+                 <h4>Purpose of Research</h4>
+                 <p>This research examines how people make judgments during conversational interactions and how these judgments change over time.</p>
+
+                 <h4>What You Will Be Asked to Do</h4>
+                 <p>If you agree to participate, you will:</p>
+                 <ul>
+                     <li>Engage in a text-based conversation with a conversational partner.</li>
+                     <li><strong>Your task: Convince your partner that you are human.</strong></li>
+                     <li>Respond naturally to your partner's questions and messages.</li>
+                     <li>You may be assigned a specific conversation style to follow during the interaction.</li>
+                     <li>Complete a brief demographic questionnaire at the beginning.</li>
+                     <li>The total time commitment will be approximately 10 minutes.</li>
+                     <li>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</li>
+                 </ul>
+
+                 <h4>Your Rights as a Participant</h4>
+                 <ul>
+                     <li>Your participation is voluntary.</li>
+                     <li>You may stop at any time.</li>
+                     <li>You may choose not to answer any question.</li>
+                     <li>You may not be told everything about the purpose of this research study initially, but you will be fully informed after completion.</li>
+                 </ul>
+
+                 <h4>Risks and Benefits</h4>
+                 <ul>
+                     <li>There are no known risks associated with participating in this study beyond those encountered in normal daily conversation.</li>
+                     <li>While there are no direct benefits to you, your participation helps advance our understanding of human-AI interaction and judgment processes.</li>
+                 </ul>
+
+                 <h4>Compensation</h4>
+                 <ul>
+                    <li>You will receive compensation equivalent to $8.00 per hour for your participation through the online platform.</li>
+                 </ul>
+
+                 <h4>Confidentiality</h4>
+                 <ul>
+                    <li>Your responses will be stored securely.</li>
+                    <li>Data will be analyzed without any identifying information.</li>
+                    <li>Only researchers will have access to the data.</li>
+                    <li>Anonymized results derived from your data may be shared in OpenScience frameworks for transparency of our research progress.</li>
+                    <li>Any personally identifying information you may share during conversations will be removed from analyses and will not be used in research outputs.</li>
+                    <li>Analyses (quantitative and qualitative) will be carried out on any text you write during the study.</li>
+                 </ul>
+
+                 <h4>Questions or Concerns?</h4>
+                 <ul>
+                    <li>For questions about the research: Contact the Principal Investigator at nvitali@fas.harvard.edu</li>
+                    <li>For questions about your rights as a participant: Contact cuhs@harvard.edu</li>
+                 </ul>
+
+                 <h4>Agreement to Participate</h4>
+                 <p>By clicking "I agree" below, you indicate that:</p>
+                 <ul>
+                    <li>You are at least 18 years old.</li>
+                    <li>You have read and understood this consent form.</li>
+                    <li>You voluntarily agree to participate as a witness.</li>
+                    <li>You understand you can withdraw at any time.</li>
+                 </ul>
+            </div>
+
             <div id="consent-actions">
                  <button id="agree-button">I agree to participate</button>
                  <button id="disagree-button" style="background-color: #dc3545;">I do not agree</button>
             </div>
- 
+
             <div id="consent-download-prompt" style="display: none; text-align: center; margin-top: 30px;">
                  <p>Thank you for agreeing to participate. Would you like to download a copy of the consent form for your records?</p>
                  <button id="download-consent-button">Download Consent Form</button>
