@@ -190,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Timer variables
     let studyTimer = null;
     let studyStartTime = null;
+    let synchronizedStartTimestamp = null; // NEW: Synchronized start time from backend (in milliseconds)
     let timeExpired = false;
     const STUDY_DURATION_MS = 7.5 * 60 * 1000; // 7.5 minutes in milliseconds
 
@@ -366,13 +367,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start the 20-minute countdown timer
     function startStudyTimer() {
-        studyStartTime = Date.now();
+        // NEW: Use synchronized timestamp from backend if available, otherwise fallback to local time
+        studyStartTime = synchronizedStartTimestamp || Date.now();
         const timerDisplay = document.getElementById('timer-display');
         const countdownTimer = document.getElementById('countdown-timer');
-        
+
         // Show the timer
         timerDisplay.style.display = 'block';
-        
+
+        // Log which timestamp source was used for debugging
+        logToRailway({
+            type: 'STUDY_TIMER_STARTED',
+            message: synchronizedStartTimestamp ? 'Timer started with synchronized backend timestamp' : 'Timer started with local timestamp (fallback)',
+            context: {
+                synchronized_timestamp: synchronizedStartTimestamp,
+                local_timestamp: Date.now(),
+                difference_ms: synchronizedStartTimestamp ? (synchronizedStartTimestamp - Date.now()) : 0
+            }
+        });
+
         studyTimer = setInterval(() => {
             const elapsed = Date.now() - studyStartTime;
             const remaining = Math.max(0, STUDY_DURATION_MS - elapsed);
@@ -397,12 +410,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 timerDisplay.style.background = 'rgba(220, 53, 69, 0.9)';
                 timerDisplay.style.fontSize = '14px';
                 timerDisplay.style.width = '300px';
-                
-                // Set initial timer message and show message if in rating phase
-                updateTimerMessage();
-                if (assessmentAreaDiv.style.display === 'block') {
-                    // NEW: Updated message for binary choice system
-                    showError('Time expired! Please complete your final rating (binary choice + confidence) to finish the study.');
+
+                // NEW: Handle timer expiry for witnesses (route to debrief)
+                if (currentRole === 'witness') {
+                    logToRailway({
+                        type: 'WITNESS_TIMER_EXPIRED',
+                        message: 'Timer expired for witness - routing to debrief form',
+                        context: { role: currentRole }
+                    });
+
+                    // Stop partner polling
+                    if (partnerPollInterval) {
+                        clearInterval(partnerPollInterval);
+                        partnerPollInterval = null;
+                    }
+
+                    // Hide chat UI
+                    chatInputContainer.style.display = 'none';
+                    timerDisplay.style.display = 'none';
+
+                    // Route witness directly to debrief form
+                    showMainPhase('final');
+                    debriefPhaseDiv.style.display = 'block';
+                    summaryPhaseDiv.style.display = 'none';
+                } else {
+                    // Interrogator flow - existing logic
+                    // Set initial timer message and show message if in rating phase
+                    updateTimerMessage();
+                    if (assessmentAreaDiv.style.display === 'block') {
+                        // NEW: Updated message for binary choice system
+                        showError('Time expired! Please complete your final rating (binary choice + confidence) to finish the study.');
+                    }
                 }
             }
         }, 1000);
@@ -611,6 +649,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const proceedAtMs = proceedAtTimestamp * 1000; // Convert Unix timestamp (seconds) to milliseconds
         const waitTimeMs = proceedAtMs - now;
 
+        // NEW: Store synchronized start timestamp for timer synchronization
+        synchronizedStartTimestamp = proceedAtMs;
+
         if (waitTimeMs > 0) {
             const secondsRemaining = Math.ceil(waitTimeMs / 1000);
             waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${secondsRemaining}s)...</span>`;
@@ -746,6 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             context: { proceed_at: proceedAtTimestamp }
                         });
                         // Fallback: proceed immediately (this is the bug!)
+                        // Use current time as synchronized start since backend didn't provide one
+                        synchronizedStartTimestamp = Date.now();
                         tryProceedToChat();
                     }
                 }
@@ -930,7 +973,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Check for partner dropout
+                // Check for study completion first (partner finished normally)
+                if (result.study_completed) {
+                    clearInterval(partnerPollInterval);
+                    partnerPollInterval = null;
+                    handleStudyCompleted();
+                    return;
+                }
+
+                // Check for partner dropout (partner actually disconnected)
                 if (result.partner_dropped) {
                     clearInterval(partnerPollInterval);
                     partnerPollInterval = null;
@@ -946,25 +997,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2000); // Poll every 2 seconds
     }
 
-    function handlePartnerDropout() {
-        logUiEvent('partner_dropped');
+    function handleStudyCompleted() {
+        logUiEvent('partner_completed_study');
+
+        // Clean up timer
+        if (studyTimer) {
+            clearInterval(studyTimer);
+        }
+        document.getElementById('timer-display').style.display = 'none';
 
         chatInputContainer.style.display = 'none';
         assessmentAreaDiv.style.display = 'none';
 
-        const dropoutMessage = document.createElement('div');
-        dropoutMessage.style.cssText = 'text-align: center; padding: 40px; background: #f8d7da; border-radius: 5px; margin: 20px;';
-        dropoutMessage.innerHTML = `
-            <h3 style="color: #721c24;">Partner Disconnected</h3>
-            <p>Your conversation partner has disconnected.</p>
-            <p>The study has ended. You will still receive compensation for your time.</p>
-            <button onclick="window.location.href='${PROLIFIC_COMPLETION_URL}'" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                Complete Study
-            </button>
-        `;
+        // Stop partner polling
+        if (partnerPollInterval) {
+            clearInterval(partnerPollInterval);
+            partnerPollInterval = null;
+        }
 
-        messageList.appendChild(dropoutMessage);
-        scrollToBottom();
+        // NEW: Route witness to debrief form instead of directly to Prolific
+        logToRailway({
+            type: 'WITNESS_ROUTING_TO_DEBRIEF',
+            message: 'Witness being routed to debrief form after interrogator completed study',
+            context: { role: currentRole }
+        });
+
+        // Show debrief form (skip feedback phase - that's only for interrogators)
+        showMainPhase('final');
+        debriefPhaseDiv.style.display = 'block';
+        summaryPhaseDiv.style.display = 'none';
+    }
+
+    function handlePartnerDropout() {
+        logUiEvent('partner_dropped');
+
+        // Clean up timer
+        if (studyTimer) {
+            clearInterval(studyTimer);
+        }
+        document.getElementById('timer-display').style.display = 'none';
+
+        chatInputContainer.style.display = 'none';
+        assessmentAreaDiv.style.display = 'none';
+
+        // Stop partner polling
+        if (partnerPollInterval) {
+            clearInterval(partnerPollInterval);
+            partnerPollInterval = null;
+        }
+
+        // NEW: Route witness to debrief form instead of directly to Prolific
+        logToRailway({
+            type: 'WITNESS_ROUTING_TO_DEBRIEF_AFTER_DROPOUT',
+            message: 'Witness being routed to debrief form after partner dropped out',
+            context: { role: currentRole }
+        });
+
+        // Show debrief form (skip feedback phase - that's only for interrogators)
+        showMainPhase('final');
+        debriefPhaseDiv.style.display = 'block';
+        summaryPhaseDiv.style.display = 'none';
     }
 
     function addMessageToUI(text, sender) {
