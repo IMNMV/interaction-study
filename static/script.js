@@ -1392,12 +1392,51 @@ By clicking "I agree" below, you indicate that:
 
     // --- Prolific Dropout and Completion Logic ---
     let handleEarlyExit = null; // Declare the variable first
-    
+    let handleActualExit = null; // Handler for when they actually leave
+
     if (isProduction) {
-        // 1. DEFINE the function that will handle premature exits
+        // 1. DEFINE the function that will handle premature exits (beforeunload)
         handleEarlyExit = (event) => {
-            // This redirects the user to Prolific if they refresh or close the tab mid-study.
-            window.location.href = PROLIFIC_TIMED_OUT_URL;
+            // Show browser warning dialog
+            logUiEvent('navigation_warning_shown', {
+                timestamp: Date.now(),
+                turn: currentTurn,
+                sessionId: sessionId,
+                role: currentRole
+            });
+
+            event.preventDefault();
+            event.returnValue = ''; // Required for Chrome
+            return ''; // Required for some browsers
+        };
+
+        // 2. DEFINE handler for when they ACTUALLY leave (clicked "Leave" in dialog)
+        handleActualExit = () => {
+            logToRailway({
+                type: 'USER_ABANDONED_STUDY',
+                message: 'User confirmed navigation away from study',
+                context: {
+                    sessionId: sessionId,
+                    turn: currentTurn,
+                    role: currentRole
+                }
+            });
+
+            // Send beacon to backend IMMEDIATELY (works even as page unloads)
+            if (sessionId) {
+                const payload = JSON.stringify({
+                    session_id: sessionId,
+                    participant_id: participantId,
+                    prolific_pid: prolificPid,
+                    reason: 'navigation_abandonment'
+                });
+
+                // Send to backend to mark abandoned and notify partner
+                navigator.sendBeacon(`${API_BASE_URL}/report_abandonment`, payload);
+            }
+
+            // Redirect to Prolific rejection (page is unloading anyway, but set it)
+            window.location.href = PROLIFIC_REJECTION_URL;
         };
     }
 
@@ -1450,9 +1489,10 @@ Thank you again for your participation!
         generateAndDownloadPdf(debriefText, `Debrief_Form_${sessionId || participantId}.pdf`);
 
         if (isProduction) {
-            // DEACTIVATE the listener so this final redirect isn't blocked
+            // DEACTIVATE the listeners so this final redirect isn't blocked
             window.removeEventListener('beforeunload', handleEarlyExit);
-            
+            window.removeEventListener('unload', handleActualExit);
+
             // Redirect to Prolific after a short delay to ensure download starts
             setTimeout(() => {
                 window.location.href = PROLIFIC_COMPLETION_URL;
@@ -1466,8 +1506,9 @@ Thank you again for your participation!
     // 3. We create the event listener for the continue button.
     continueAfterDebriefButton.addEventListener('click', () => {
         if (isProduction) {
-            // DEACTIVATE the listener before the final redirect
+            // DEACTIVATE the listeners before the final redirect
             window.removeEventListener('beforeunload', handleEarlyExit);
+            window.removeEventListener('unload', handleActualExit);
             window.location.href = PROLIFIC_COMPLETION_URL;
         } else {
             // For local testing, just proceed to the summary page
@@ -1615,9 +1656,10 @@ Thank you again for your participation!
             currentTurn = 0;
             messageList.innerHTML = '';
 
-            // Activate the early exit listener now that the study has officially begun
+            // Activate the early exit listeners now that the study has officially begun
             if (isProduction) {
-                window.addEventListener('beforeunload', handleEarlyExit);
+                window.addEventListener('beforeunload', handleEarlyExit); // Warning dialog
+                window.addEventListener('unload', handleActualExit); // Actual exit tracking
             }
 
             // NOW enter waiting room (handles both AI and human partner modes)
