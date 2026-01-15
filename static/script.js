@@ -1189,17 +1189,73 @@ document.addEventListener('DOMContentLoaded', () => {
             witnessEndModal.style.display = 'flex';
 
         } else {
-            // INTERROGATOR: Set flag only - modal shown later when they try to interact
+            // INTERROGATOR: Route to completion flow automatically
             partnerDroppedFlag = true;
 
-            logToRailway({
-                type: 'INTERROGATOR_PARTNER_DROPPED_FLAG_SET',
-                message: 'Partner dropped - flag set, will show modal when interrogator tries to send message or finishes rating',
-                context: { role: currentRole }
-            });
+            // Clean up timer
+            if (studyTimer) {
+                clearInterval(studyTimer);
+            }
+            document.getElementById('timer-display').style.display = 'none';
 
-            // Don't show modal yet - they might be in middle of rating or typing
-            // Modal will show when they try to send message or after they submit rating
+            // Hide chat input (can't send more messages)
+            chatInputContainer.style.display = 'none';
+
+            // Check if there's an unrated message (assessment area is visible)
+            const hasUnratedMessage = assessmentAreaDiv.style.display === 'block';
+
+            if (hasUnratedMessage) {
+                // They have an unrated last message - keep assessment visible, show notification
+                logToRailway({
+                    type: 'INTERROGATOR_PARTNER_DROPPED_WITH_UNRATED',
+                    message: 'Partner dropped - interrogator has unrated message, showing notification and keeping assessment visible',
+                    context: { role: currentRole }
+                });
+
+                // Show brief notification modal
+                interrogatorConnectionModal.style.display = 'flex';
+
+                // Auto-close after 4 seconds
+                setTimeout(() => {
+                    interrogatorConnectionModal.style.display = 'none';
+
+                    // Update assessment UI to indicate this is final rating
+                    const assessmentTitle = assessmentAreaDiv.querySelector('h4');
+                    if (assessmentTitle) {
+                        assessmentTitle.textContent = "Your partner has disconnected. Please submit your final rating for this message:";
+                    }
+
+                    logToRailway({
+                        type: 'INTERROGATOR_NOTIFIED_SUBMIT_FINAL_RATING',
+                        message: 'Auto-closed notification, interrogator can now submit final rating',
+                        context: { role: currentRole }
+                    });
+                }, 4000);
+
+            } else {
+                // No unrated message - route directly to feedback
+                logToRailway({
+                    type: 'INTERROGATOR_PARTNER_DROPPED_NO_UNRATED',
+                    message: 'Partner dropped - no unrated message, routing directly to feedback',
+                    context: { role: currentRole }
+                });
+
+                // Show brief notification modal
+                interrogatorConnectionModal.style.display = 'flex';
+
+                // Auto-close after 3 seconds and route to feedback
+                setTimeout(() => {
+                    interrogatorConnectionModal.style.display = 'none';
+                    showMainPhase('feedback');
+                    feedbackTextarea.focus();
+
+                    logToRailway({
+                        type: 'INTERROGATOR_ROUTED_TO_FEEDBACK',
+                        message: 'Auto-closed notification, routed to feedback form',
+                        context: { role: currentRole }
+                    });
+                }, 3000);
+            }
         }
     }
 
@@ -2768,15 +2824,16 @@ Thank you again for your participation!
                     if (partnerDroppedFlag) {
                         logToRailway({
                             type: 'INTERROGATOR_FINISHED_RATING_AFTER_DROPOUT',
-                            message: 'Interrogator finished rating after partner dropped - showing connection modal',
+                            message: 'Interrogator finished rating after partner dropped - routing to feedback',
                             context: { role: currentRole }
                         });
 
                         // Hide rating UI
                         assessmentAreaDiv.style.display = 'none';
 
-                        // Show connection issue modal
-                        interrogatorConnectionModal.style.display = 'flex';
+                        // Route directly to feedback (comment then debrief)
+                        showMainPhase('feedback');
+                        feedbackTextarea.focus();
 
                     } else if (feelsOffCheckbox.checked && feelsOffCommentTextarea.value.trim() !== '') {
                         assessmentAreaDiv.querySelector('h4').textContent = "Rating Submitted. Now, please submit your comment:";
