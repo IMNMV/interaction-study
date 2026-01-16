@@ -213,7 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Enhanced reaction time tracking variables
     let confidenceStartTime = null; // When they first touch the slider (after binary choice)
     let sliderInteractionLog = []; // Log of all slider interactions
-    
+
+    // NEW: Message composition time tracking
+    let messageCompositionStartTime = null; // When they first start typing a message
+
     // NEW: Fallback storage for failed network delay updates
     let pendingNetworkDelayUpdates = []; // Store failed updates for later retry
     
@@ -1974,6 +1977,16 @@ Thank you again for your participation!
     // NEW: Real typing detection for human-human conversations
     let typingSignalTimeout = null;
     userMessageInput.addEventListener('input', () => {
+        // NEW: Track message composition time (for ALL modes - witness and interrogator)
+        if (messageCompositionStartTime === null && userMessageInput.value.trim().length > 0) {
+            messageCompositionStartTime = Date.now();
+            logToRailway({
+                type: 'MESSAGE_COMPOSITION_START',
+                message: 'User started typing message',
+                context: { role: currentRole, timestamp: messageCompositionStartTime }
+            });
+        }
+
         // Only send typing signals in human partner mode
         if (!isHumanPartner || !sessionId || waitingForPartner) {
             return;
@@ -2273,7 +2286,7 @@ Thank you again for your participation!
 
 
     // NEW: Retry logic for API requests - now returns network delay
-    async function sendMessageWithRetry(messageText, typingDelaySeconds, maxRetries = 3) {
+    async function sendMessageWithRetry(messageText, typingDelaySeconds, messageCompositionTimeSeconds = null, maxRetries = 3) {
         const apiCallStartTime = Date.now();
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -2286,7 +2299,8 @@ Thank you again for your participation!
                         session_id: sessionId,
                         message_length: messageText.length,
                         attempt: attempt,
-                        max_retries: maxRetries
+                        max_retries: maxRetries,
+                        composition_time_seconds: messageCompositionTimeSeconds
                     }
                 });
 
@@ -2294,14 +2308,15 @@ Thank you again for your participation!
                 // NEW: Reduced timeout to 60 seconds to prevent excessive waits
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout (reduced from 120s)
-                
+
                 const response = await fetch('/send_message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         session_id: sessionId,
                         message: messageText,
-                        typing_indicator_delay_seconds: typingDelaySeconds
+                        typing_indicator_delay_seconds: typingDelaySeconds,
+                        message_composition_time_seconds: messageCompositionTimeSeconds
                     }),
                     signal: controller.signal
                 });
@@ -2495,6 +2510,21 @@ Thank you again for your participation!
         const messageText = userMessageInput.value.trim();
         if (!messageText || !sessionId) return;
 
+        // NEW: Calculate message composition time
+        let messageCompositionTimeSeconds = null;
+        if (messageCompositionStartTime) {
+            messageCompositionTimeSeconds = (Date.now() - messageCompositionStartTime) / 1000;
+            logToRailway({
+                type: 'MESSAGE_COMPOSITION_TIME',
+                message: 'Message composition time calculated',
+                context: {
+                    role: currentRole,
+                    composition_time_seconds: messageCompositionTimeSeconds,
+                    message_length: messageText.length
+                }
+            });
+        }
+
         // NEW: Check if partner has dropped - show modal instead of sending
         if (partnerDroppedFlag) {
             logToRailway({
@@ -2515,6 +2545,9 @@ Thank you again for your participation!
         }
 
         addMessageToUI(messageText, 'user');
+
+        // Reset composition time tracker for next message
+        messageCompositionStartTime = null;
 
         userMessageInput.value = '';
         userMessageInput.disabled = true;
@@ -2543,7 +2576,7 @@ Thank you again for your participation!
 
         try {
             // Use new retry logic that returns network delay and attempt count
-            const { response, result, networkDelaySeconds, attempts } = await sendMessageWithRetry(messageText, indicatorDelay / 1000);
+            const { response, result, networkDelaySeconds, attempts } = await sendMessageWithRetry(messageText, indicatorDelay / 1000, messageCompositionTimeSeconds);
 
             // If we get here, the retry succeeded - hide typing indicator and process response
             typingIndicator.dataset.runId = String((Number(typingIndicator.dataset.runId) || 0) + 1);
