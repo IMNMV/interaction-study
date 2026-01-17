@@ -1617,6 +1617,12 @@ Thank you again for your participation!
     witnessEndContinueButton.addEventListener('click', () => {
         logUiEvent('witness_modal_continue_clicked');
 
+        logToRailway({
+            type: 'WITNESS_MODAL_CONTINUE_CLICKED',
+            message: 'Witness clicked continue on end modal - routing to binary choice',
+            context: { role: currentRole, turn: currentTurn }
+        });
+
         // Hide modal
         witnessEndModal.style.display = 'none';
 
@@ -1629,18 +1635,44 @@ Thank you again for your participation!
         // Reset binary choice state
         binaryChoice = null;
         binaryChoiceStartTime = Date.now();
+        binaryChoiceInProgress = false; // Reset double-click protection
 
-        // Show binary choice buttons
-        document.getElementById('binary-choice-area').style.display = 'block';
-        document.getElementById('confidence-slider-area').style.display = 'none';
+        // Show binary choice buttons and enable them
+        const binaryChoiceArea = document.getElementById('binary-choice-area');
+        const confidenceArea = document.getElementById('confidence-slider-area');
+
+        if (binaryChoiceArea) {
+            binaryChoiceArea.style.display = 'block';
+        }
+        if (confidenceArea) {
+            confidenceArea.style.display = 'none';
+        }
+
+        // Ensure binary choice buttons are enabled
+        choiceHumanButton.disabled = false;
+        choiceAiButton.disabled = false;
 
         // Update prompt for witness
-        document.getElementById('binary-choice-prompt').textContent = 'Based on your conversation, do you think your partner was:';
+        const binaryPrompt = document.getElementById('binary-choice-prompt');
+        if (binaryPrompt) {
+            binaryPrompt.textContent = 'Based on your conversation, do you think your partner was:';
+        }
+
+        // Update assessment title
+        const assessmentTitle = assessmentAreaDiv.querySelector('h4');
+        if (assessmentTitle) {
+            assessmentTitle.textContent = "Your Final Assessment";
+        }
 
         logToRailway({
             type: 'WITNESS_BINARY_CHOICE_SHOWN',
-            message: 'Witness routing to binary choice + comment before debrief',
-            context: { role: currentRole }
+            message: 'Witness binary choice UI displayed - will route to comment after selection',
+            context: {
+                role: currentRole,
+                turn: currentTurn,
+                binaryChoiceAreaVisible: binaryChoiceArea ? binaryChoiceArea.style.display : 'unknown',
+                assessmentAreaVisible: assessmentAreaDiv.style.display
+            }
         });
     });
 
