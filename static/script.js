@@ -241,6 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let matchCheckInterval = null;
     let waitingTimerInterval = null; // NEW: Separate interval for waiting room timer
     let partnerPollInterval = null;
+    let intermittentBubbleTimeout = null; // NEW: Track intermittent bubble animation timeout
+    let isShowingIntermittentBubbles = false; // NEW: Flag to track if intermittent bubbles are active
 
     // --- NEW: SLIDER VALUE DISPLAY LOGIC ---
     const allSliders = document.querySelectorAll('#initial-form input[type="range"]');
@@ -1046,14 +1048,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await messageResponse.json();
                 const typingResult = await typingResponse.json();
 
-                // Update typing indicator based on partner's REAL typing status
-                // IMPORTANT: If partner is typing, reset inactivity timer (they're still active!)
-                if (typingResult.is_typing) {
+                // NEW: Handle artificial delay (partner_typing from check_partner_message)
+                // This signals partner sent message but it's being artificially delayed
+                if (result.partner_typing) {
                     lastActivityTime = Date.now(); // Reset timer - partner is active
-                    typingIndicator.style.display = 'flex';
-                    scrollToBottom();
+                    // Start intermittent bubbles if not already running
+                    if (!isShowingIntermittentBubbles) {
+                        startIntermittentBubbles();
+                    }
                 } else {
-                    typingIndicator.style.display = 'none';
+                    // Stop intermittent bubbles if they were running
+                    if (isShowingIntermittentBubbles) {
+                        stopIntermittentBubbles();
+                    }
+
+                    // Update typing indicator based on partner's REAL typing status
+                    // IMPORTANT: If partner is typing, reset inactivity timer (they're still active!)
+                    if (typingResult.is_typing) {
+                        lastActivityTime = Date.now(); // Reset timer - partner is active
+                        typingIndicator.style.display = 'flex';
+                        scrollToBottom();
+                    } else {
+                        typingIndicator.style.display = 'none';
+                    }
                 }
 
                 if (result.new_message) {
@@ -1069,6 +1086,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     clearInterval(partnerPollInterval);
                     partnerPollInterval = null;
+
+                    // NEW: Stop intermittent bubbles if they were running
+                    if (isShowingIntermittentBubbles) {
+                        stopIntermittentBubbles();
+                    }
 
                     // Add partner's message to UI
                     addMessageToUI(result.message_text, 'assistant');
@@ -2293,11 +2315,64 @@ Thank you again for your participation!
         // Tag this animation run so stale timeouts can't re-show the indicator later
         const runId = String(Date.now());
         typingIndicator.dataset.runId = runId;
-        
+
         // That's it - just show it and leave it on until the message arrives
         return null;
     }
-            
+
+    // NEW: Intermittent bubble animation for artificial delay in human mode
+    // Shows/hides bubbles with randomized timing to simulate ongoing typing
+    function startIntermittentBubbles() {
+        // Clear any existing timeout
+        if (intermittentBubbleTimeout) {
+            clearTimeout(intermittentBubbleTimeout);
+            intermittentBubbleTimeout = null;
+        }
+
+        isShowingIntermittentBubbles = true;
+
+        function scheduleBubbleCycle() {
+            if (!isShowingIntermittentBubbles) return; // Stop if flag is disabled
+
+            // Random show duration: 2-5 seconds
+            const showDuration = (Math.random() * 3000) + 2000;
+
+            // Show bubbles
+            typingIndicator.style.display = 'flex';
+            scrollToBottom();
+
+            intermittentBubbleTimeout = setTimeout(() => {
+                if (!isShowingIntermittentBubbles) return;
+
+                // Hide bubbles
+                typingIndicator.style.display = 'none';
+
+                // Random hide duration: 1-3 seconds
+                const hideDuration = (Math.random() * 2000) + 1000;
+
+                intermittentBubbleTimeout = setTimeout(() => {
+                    if (!isShowingIntermittentBubbles) return;
+                    scheduleBubbleCycle(); // Restart cycle
+                }, hideDuration);
+            }, showDuration);
+        }
+
+        // Start the cycle
+        scheduleBubbleCycle();
+    }
+
+    function stopIntermittentBubbles() {
+        isShowingIntermittentBubbles = false;
+
+        if (intermittentBubbleTimeout) {
+            clearTimeout(intermittentBubbleTimeout);
+            intermittentBubbleTimeout = null;
+        }
+
+        // Hide bubbles
+        typingIndicator.style.display = 'none';
+    }
+
 
 
 
