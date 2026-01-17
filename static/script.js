@@ -559,6 +559,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     userMessageInput.disabled = false;
                     sendMessageButton.disabled = false;
                     userMessageInput.focus();
+
+                    // NEW: Start continuous polling for interrogators in human mode
+                    // This ensures they detect partner dropouts even when idle
+                    if (isHumanPartner) {
+                        startPartnerResponsePolling();
+                    }
                 } else {
                     // Waiting for witness's first message (shouldn't happen since interrogator always goes first)
                     userMessageInput.disabled = true;
@@ -2896,6 +2902,12 @@ Thank you again for your participation!
                         userMessageInput.disabled = false;
                         sendMessageButton.disabled = false;
                         userMessageInput.focus();
+
+                        // NEW: Restart continuous polling for interrogators in human mode
+                        // After rating, they're back to idle state and need to detect partner dropouts
+                        if (currentRole === 'interrogator' && isHumanPartner && !partnerPollInterval) {
+                            startPartnerResponsePolling();
+                        }
 
                         // Update timer message for State 3→1 transition (back to chat input)
                         updateTimerMessage();
