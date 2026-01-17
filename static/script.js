@@ -517,6 +517,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Switch to the main chat page view
             showMainPhase('chat_and_assessment_flow');
 
+            // NEW: Update conversation header for witnesses in human mode
+            const conversationHeader = document.getElementById('conversation-header');
+            if (currentRole === 'witness' && isHumanPartner && assignedSocialStyle && assignedSocialStyleDescription) {
+                // Show style instructions for witness
+                conversationHeader.innerHTML = `<strong>Style: ${assignedSocialStyle}</strong><br><span style="font-size: 0.9em; font-weight: normal;">${assignedSocialStyleDescription}</span>`;
+            } else {
+                // Default header for interrogators or AI mode
+                conversationHeader.textContent = 'Conversation';
+            }
+
             // Configure UI based on role
             assessmentAreaDiv.style.display = 'none';
 
