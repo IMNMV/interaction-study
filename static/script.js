@@ -76,6 +76,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const interrogatorInstructionsDiv = document.getElementById('interrogator-instructions');
     const witnessInstructionsDiv = document.getElementById('witness-instructions');
     const enterWaitingRoomButton = document.getElementById('enter-waiting-room-button');
+
+    // Pre-demographics instruction elements (mode-aware)
+    const preDemoInterrogatorInstructions = document.getElementById('pre-demo-interrogator-instructions');
+    const preDemoHumanWitnessInstructions = document.getElementById('pre-demo-human-witness-instructions');
+    const preDemoStyleNameSpan = document.getElementById('pre-demo-style-name');
     const waitingStatusP = document.getElementById('waiting-status');
     const elapsedTimeSpan = document.getElementById('elapsed-time');
     const waitingTimeoutWarningDiv = document.getElementById('waiting-timeout-warning');
@@ -83,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const interrogatorRatingUI = document.getElementById('interrogator-rating-ui');
     const witnessWaitingUI = document.getElementById('witness-waiting-ui');
     const witnessStyleNameSpan = document.getElementById('witness-style-name');
+    const witnessStyleName2Span = document.getElementById('witness-style-name-2');
     const witnessStyleDescriptionP = document.getElementById('witness-style-description');
 
     // NEW: Witness end-of-study modal
@@ -650,13 +656,18 @@ document.addEventListener('DOMContentLoaded', () => {
             assignedSocialStyle = result.social_style || null;
             assignedSocialStyleDescription = result.social_style_description || null;
 
+            // Set study mode immediately (available from page load)
+            isHumanPartner = result.study_mode === "HUMAN_WITNESS";
+
             logToRailway({
                 type: 'ROLE_ASSIGNED',
                 message: `Role assigned: ${assignedRole}`,
                 context: {
                     role: assignedRole,
                     social_style: assignedSocialStyle,
-                    is_existing: result.is_existing
+                    is_existing: result.is_existing,
+                    study_mode: result.study_mode,
+                    isHumanPartner: isHumanPartner
                 }
             });
 
@@ -729,6 +740,40 @@ document.addEventListener('DOMContentLoaded', () => {
         // Button text stays "Enter Waiting Room"
     }
 
+    // Show the correct pre-demographics instructions based on role and mode
+    function showPreDemoInstructions() {
+        // Hide all instruction variants first
+        if (preDemoInterrogatorInstructions) preDemoInterrogatorInstructions.style.display = 'none';
+        if (preDemoHumanWitnessInstructions) preDemoHumanWitnessInstructions.style.display = 'none';
+
+        if (assignedRole === 'interrogator') {
+            // Interrogator instructions (same for both modes)
+            if (preDemoInterrogatorInstructions) {
+                preDemoInterrogatorInstructions.style.display = 'block';
+            }
+        } else if (assignedRole === 'witness' && isHumanPartner) {
+            // Human mode witness - show witness-specific instructions with style name
+            if (preDemoHumanWitnessInstructions) {
+                preDemoHumanWitnessInstructions.style.display = 'block';
+                // Populate the style name
+                if (preDemoStyleNameSpan && assignedSocialStyle) {
+                    preDemoStyleNameSpan.textContent = assignedSocialStyle;
+                }
+            }
+        }
+        // Note: AI mode witness doesn't exist (AI mode only has interrogators)
+
+        logToRailway({
+            type: 'PRE_DEMO_INSTRUCTIONS_SHOWN',
+            message: 'Pre-demographics instructions displayed',
+            context: {
+                role: assignedRole,
+                isHumanPartner: isHumanPartner,
+                socialStyle: assignedSocialStyle
+            }
+        });
+    }
+
     function showRoleInstructionsInWaitingRoom(role, socialStyle = null, socialStyleDescription = null) {
         // Show role-specific instructions INSIDE the waiting room
         const instructionsDiv = document.getElementById('waiting-room-instructions');
@@ -754,22 +799,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (socialStyle && socialStyleDescription) {
                 styleSection = `
                     <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
-                        <p style="margin: 0; font-weight: bold;">Your conversation style: ${socialStyle}</p>
-                        <p style="margin: 10px 0 0 0;">${socialStyleDescription}</p>
+                        <p style="margin: 0;">The conversation style we'd like you to use is <strong>${socialStyle}</strong>.</p>
+                        <p style="margin: 10px 0 0 0;">Some ways for you to use this style: ${socialStyleDescription}</p>
                     </div>
                 `;
             }
 
             instructionsContent.innerHTML = `
-                <p><strong>Your task:</strong> Have a conversation with your partner and convince them you are human.</p>
                 ${styleSection}
-                <ul style="text-align: left; margin: 15px 0;">
-                    <li>Your partner will start the conversation</li>
-                    <li>Respond naturally to their questions</li>
-                    <li>Try to convince them you are human (even though you are!)</li>
-                    ${socialStyle ? '<li>Follow the conversation style above</li>' : '<li>Be yourself and chat naturally</li>'}
-                </ul>
-                <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
             `;
         }
 
@@ -1410,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logUiEvent('consent_skip_download_clicked');
         // If they skip download, just move to the next phase.
         showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
-
+        showPreDemoInstructions(); // Show role/mode-specific instructions
     });
 
     downloadConsentButton.addEventListener('click', () => {
@@ -1481,10 +1518,10 @@ By clicking "I agree" below, you indicate that:
         `;
         
         generateAndDownloadPdf(consentText, `Consent_Form_${participantId}.pdf`);
-        
+
         // Move to the next phase after starting the download.
         showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
-
+        showPreDemoInstructions(); // Show role/mode-specific instructions
     });
 
     // --- Prolific Dropout and Completion Logic ---
@@ -1816,6 +1853,7 @@ Thank you again for your participation!
                     // NEW: If witness, populate social style instructions
                     if (currentRole === 'witness' && roleResult.social_style) {
                         witnessStyleNameSpan.textContent = roleResult.social_style;
+                        if (witnessStyleName2Span) witnessStyleName2Span.textContent = roleResult.social_style;
                         witnessStyleDescriptionP.textContent = roleResult.social_style_description;
 
                         logToRailway({
