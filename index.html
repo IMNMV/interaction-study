@@ -172,42 +172,77 @@
 
         <div id="instructions-phase" class="study-phase" style="display: none;">
             <h2>Welcome to the Interaction Study</h2>
-            <p>
-                In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human. If your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible.</strong>
-            <p>
-                Please assume AI means Large Language Model (LLM), such as ChatGPT.
-            <p>
-            <p>
-                On the next page you will complete a brief form and then randomly assigned to either send the first message or receive the first message.
-                After that you will be shown a conversation box where you can chat back and forth with your partner.
-                Your conversation partner knows they're being evaluated and is trying to appear as human-like as possible. You can talk about anything you would like to make your decision.
-            <p>
-                <strong><em>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</em></strong>
-            </p>
-            <p>
-                <strong>After each message, you'll answer two questions:</strong>
-            </p>
-            <ol>
-                <li><strong>Right now, what's your best guess?</strong> (Human / AI)
-                    <ul>
-                        <li>This isn't a final answer, just where you're leaning at this moment.</li>
-                        <li><em>Make sure you're ready before selecting - once you click, it moves on to the next question.</em></li>
-                    </ul>
-                </li>
-                <li><strong>How confident are you in that guess?</strong> (0-100%)
-                    <ul>
-                        <li>0% = completely uncertain</li>
-                        <li>50% = basically guessing</li>
-                        <li>100% = completely certain</li>
-                    </ul>
-                </li>
-            </ol>
-            <p>
-                <strong><em>Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human. Then, evaluate each message sent by your conversation partner as evidence towards your judgment for that turn.</em></strong>
-            </p>
-            <p>
-                You can change your mind as many times as you want across turns. We're interested in how your impression evolves.
-            </p>
+
+            <!-- INTERROGATOR INSTRUCTIONS (same for both modes) -->
+            <div id="pre-demo-interrogator-instructions" style="display: none;">
+                <p>
+                    In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human. If your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible.</strong>
+                </p>
+                <p>
+                    Please assume AI means Large Language Model (LLM), such as ChatGPT.
+                </p>
+                <p>
+                    On the next page you will complete a brief form and then randomly assigned to either send the first message or receive the first message.
+                    After that you will be shown a conversation box where you can chat back and forth with your partner.
+                    Your conversation partner knows they're being evaluated and is trying to appear as human-like as possible. You can talk about anything you would like to make your decision.
+                </p>
+                <p>
+                    <strong><em>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</em></strong>
+                </p>
+                <p>
+                    <strong>After each message, you'll answer two questions:</strong>
+                </p>
+                <ol>
+                    <li><strong>Right now, what's your best guess?</strong> (Human / AI)
+                        <ul>
+                            <li>This isn't a final answer, just where you're leaning at this moment.</li>
+                            <li><em>Make sure you're ready before selecting - once you click, it moves on to the next question.</em></li>
+                        </ul>
+                    </li>
+                    <li><strong>How confident are you in that guess?</strong> (0-100%)
+                        <ul>
+                            <li>0% = completely uncertain</li>
+                            <li>50% = basically guessing</li>
+                            <li>100% = completely certain</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p>
+                    <strong><em>Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human. Then, evaluate each message sent by your conversation partner as evidence towards your judgment for that turn.</em></strong>
+                </p>
+                <p>
+                    You can change your mind as many times as you want across turns. We're interested in how your impression evolves.
+                </p>
+            </div>
+
+            <!-- HUMAN MODE WITNESS INSTRUCTIONS -->
+            <div id="pre-demo-human-witness-instructions" style="display: none;">
+                <p>
+                    In this study, you'll be having a conversation. <strong>Your task is to determine whether you're talking to an AI or a human. If your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible.</strong>
+                </p>
+                <p>
+                    Please assume AI means Large Language Model (LLM), such as ChatGPT.
+                </p>
+                <p>
+                    On the next page you will complete a brief form and then randomly assigned to either send the first message or receive the first message. After that you will be shown a conversation box where you can chat back and forth with your partner.
+                </p>
+                <p>
+                    We're interested in how conversational styles impact online conversations. We'd like you to adopt a particular style here to test how this influences people's perception when they're in situations of uncertainty.
+                </p>
+                <p>
+                    The conversation style we'd like you to use is <strong><span id="pre-demo-style-name"></span></strong>.
+                </p>
+                <p>
+                    Some ways for you to use this style: You just say what you think, no need to beat around the bush. You don't need to be rude, but don't worry about being overly polite either. The conversation should be blunt and honest. Try to keep up this style for the entire conversation.
+                </p>
+                <p>
+                    We find many of our subjects wonder if they're interacting with an AI, so you may find that they're some questions about whether or not you're human. Feel free to respond to these questions in the style you've been assigned. If people ask if you're an AI, you may tell them you're not in the style you've been assigned.
+                </p>
+                <p>
+                    <strong><em>You are free to share information as you see fit during the conversation but should not share more than you would be willing to share with a stranger.</em></strong>
+                </p>
+            </div>
+
             <button id="confirm-instructions-button">I Understand, Continue</button>
         </div>
 
@@ -413,21 +448,24 @@
             <div id="witness-instructions" style="display: none;">
                 <h3>Your Task</h3>
                 <p>You are the <strong>WITNESS</strong>.</p>
-                <p>Your job is to convince the interrogator that you are human.</p>
+                <p>
+                    In a moment you will see a conversation box. Like mentioned before, your job is to simply chat with your partner. They may ask if you are an AI in which case, you can tell them you're a human.
+                </p>
+                <p>
+                    <strong>Do not lie and say you are an AI.</strong>
+                </p>
+                <p>
+                    You will chat with your partner for 7 minutes and 30 seconds. At the 7 minute 30 second mark you will be asked for a single choice question and will then provide a comment before completing the study.
+                </p>
+                <p>
+                    Response delays are expected between messages, but the total chat time will be 7 minutes and 30 seconds. If your partner leaves the chat, you will be routed to the end of the study. Please do not leave, or refresh the page as you will be disconnected.
+                </p>
 
-                <!-- NEW: Social style instructions (populated by JavaScript) -->
+                <!-- Social style reminder with examples -->
                 <div id="witness-social-style" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
-                    <p style="margin: 0; font-weight: bold;">Your conversation style: <span id="witness-style-name"></span></p>
-                    <p id="witness-style-description" style="margin: 10px 0 0 0;"></p>
+                    <p style="margin: 0;"><strong>Your style is: <span id="witness-style-name"></span></strong></p>
+                    <p style="margin: 10px 0 0 0;">Examples: <span id="witness-style-description"></span> of <span id="witness-style-name-2"></span></p>
                 </div>
-
-                <ul>
-                    <li><strong>The interrogator will send the first message</strong></li>
-                    <li>Respond naturally to their questions</li>
-                    <li>Follow the conversation style above</li>
-                    <li>The conversation lasts 7 minutes and 30 seconds</li>
-                    <li>The interrogator will be making the final decision</li>
-                </ul>
             </div>
 
             <button id="enter-waiting-room-button" class="cta-button">Enter Waiting Room</button>
