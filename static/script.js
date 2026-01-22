@@ -247,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let matchCheckInterval = null;
     let waitingTimerInterval = null; // NEW: Separate interval for waiting room timer
     let partnerPollInterval = null;
+    let backgroundDropoutCheckInterval = null; // Lightweight check for partner_dropped while composing
     let intermittentBubbleTimeout = null; // NEW: Track intermittent bubble animation timeout
     let isShowingIntermittentBubbles = false; // NEW: Flag to track if intermittent bubbles are active
 
@@ -1050,6 +1051,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(partnerPollInterval);
         }
 
+        // Stop background dropout check if running - main polling takes over
+        stopBackgroundDropoutCheck();
+
         // Start with typing indicator hidden - will show when partner actually types
         typingIndicator.style.display = 'none';
         scrollToBottom();
@@ -1124,6 +1128,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(partnerPollInterval);
                     partnerPollInterval = null;
 
+                    // Start background dropout check while composing (human mode only)
+                    // This ensures we detect if partner drops out while we're typing
+                    if (isHumanPartner) {
+                        startBackgroundDropoutCheck();
+                    }
+
                     // NEW: Stop intermittent bubbles if they were running
                     if (isShowingIntermittentBubbles) {
                         stopIntermittentBubbles();
@@ -1194,6 +1204,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2000); // Poll every 2 seconds
     }
 
+    // Lightweight background check for partner_dropped status while user is composing
+    // This runs at a slower rate and ONLY checks for dropout/completion - no message handling
+    function startBackgroundDropoutCheck() {
+        // Clear any existing background check
+        if (backgroundDropoutCheckInterval) {
+            clearInterval(backgroundDropoutCheckInterval);
+        }
+
+        backgroundDropoutCheckInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/check_partner_message?session_id=${sessionId}`);
+                const result = await response.json();
+
+                // Only care about dropout and completion - ignore new messages (main polling handles those)
+                if (result.partner_dropped) {
+                    clearInterval(backgroundDropoutCheckInterval);
+                    backgroundDropoutCheckInterval = null;
+
+                    logToRailway({
+                        type: 'BACKGROUND_CHECK_DETECTED_DROPOUT',
+                        message: 'Background check detected partner dropout while composing',
+                        context: { role: currentRole }
+                    });
+
+                    handlePartnerDropout();
+                    return;
+                }
+
+                if (result.study_completed) {
+                    clearInterval(backgroundDropoutCheckInterval);
+                    backgroundDropoutCheckInterval = null;
+
+                    logToRailway({
+                        type: 'BACKGROUND_CHECK_DETECTED_COMPLETION',
+                        message: 'Background check detected study completion while composing',
+                        context: { role: currentRole }
+                    });
+
+                    handleStudyCompleted();
+                    return;
+                }
+            } catch (error) {
+                logToRailway({
+                    type: 'BACKGROUND_DROPOUT_CHECK_ERROR',
+                    message: `Error in background dropout check: ${error.message}`
+                });
+            }
+        }, 5000); // Check every 5 seconds (slower than main polling)
+    }
+
+    function stopBackgroundDropoutCheck() {
+        if (backgroundDropoutCheckInterval) {
+            clearInterval(backgroundDropoutCheckInterval);
+            backgroundDropoutCheckInterval = null;
+        }
+    }
+
     function handleStudyCompleted() {
         logUiEvent('partner_completed_study');
 
@@ -1208,6 +1275,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(partnerPollInterval);
             partnerPollInterval = null;
         }
+
+        // Stop background dropout check if running
+        stopBackgroundDropoutCheck();
 
         // NEW: Only witnesses should see this (interrogator completed)
         if (currentRole === 'witness') {
@@ -1237,13 +1307,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function handlePartnerDropout() {
         logUiEvent('partner_dropped');
 
+        // CRITICAL: Notify backend FIRST so partner's session gets marked as partner_dropped
+        // This allows partner to detect dropout when they next poll
+        fetch(`${API_BASE_URL}/report_partner_dropped`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+        }).catch(err => {
+            logToRailway({
+                type: 'REPORT_PARTNER_DROPPED_ERROR',
+                message: `Failed to report partner dropout: ${err.message}`,
+                context: { session_id: sessionId }
+            });
+        });
+
         // Stop partner polling
         if (partnerPollInterval) {
             clearInterval(partnerPollInterval);
             partnerPollInterval = null;
         }
 
-        // NEW: Different handling based on role
+        // Stop background dropout check if running
+        stopBackgroundDropoutCheck();
+
+        // Different handling based on role
         if (currentRole === 'witness') {
             // WITNESS: Show modal immediately - their study is over
             // Clean up timer
