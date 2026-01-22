@@ -519,6 +519,12 @@
        <!-- Chat Interface is now the main container for conversation and assessment -->
        <div id="chat-interface" class="study-phase" style="display: none;">
            <h3 id="conversation-header">Conversation</h3>
+
+           <!-- AI Mode Retry Banner (shown during API retries, no interaction needed) -->
+           <div id="ai-retry-banner" style="display: none; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 10px 15px; margin-bottom: 10px; text-align: center; color: #856404; font-size: 14px;">
+               Sorry! The connection is a bit unstable with your partner. Please be patient.
+           </div>
+
            <div class="chat-window">
                <div id="message-list">
                    <!-- Messages will be appended here -->
