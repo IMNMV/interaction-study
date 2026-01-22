@@ -285,6 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function showError(message) {
         errorMessageArea.textContent = message;
         errorMessageArea.style.display = 'block';
+        // Scroll to error so it's visible even on maximized windows
+        errorMessageArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(() => {
             errorMessageArea.style.display = 'none';
         }, 5000);
