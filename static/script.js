@@ -78,10 +78,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const witnessInstructionsDiv = document.getElementById('witness-instructions');
     const enterWaitingRoomButton = document.getElementById('enter-waiting-room-button');
 
-    // Pre-demographics instruction elements (mode-aware)
-    const preDemoInterrogatorInstructions = document.getElementById('pre-demo-interrogator-instructions');
-    const preDemoHumanWitnessInstructions = document.getElementById('pre-demo-human-witness-instructions');
+    // Pre-demographics instruction elements (paginated)
+    const instructionPages = document.querySelectorAll('.instruction-page');
+    const instructionPrevBtn = document.getElementById('instruction-prev-btn');
+    const instructionNextBtn = document.getElementById('instruction-next-btn');
+    const instructionPageIndicator = document.getElementById('instruction-page-indicator');
     const preDemoStyleNameSpan = document.getElementById('pre-demo-style-name');
+    const preDemoStyleNameRepeatSpans = document.querySelectorAll('.pre-demo-style-name-repeat');
+    let currentInstructionPage = 1;
+    const totalInstructionPages = 3;
     const waitingStatusP = document.getElementById('waiting-status');
     const elapsedTimeSpan = document.getElementById('elapsed-time');
     const waitingTimeoutWarningDiv = document.getElementById('waiting-timeout-warning');
@@ -742,37 +747,80 @@ document.addEventListener('DOMContentLoaded', () => {
         // Button text stays "Enter Waiting Room"
     }
 
-    // Show the correct pre-demographics instructions based on role and mode
+    // Show the correct pre-demographics instructions based on role and mode (paginated)
     function showPreDemoInstructions() {
-        // Hide all instruction variants first
-        if (preDemoInterrogatorInstructions) preDemoInterrogatorInstructions.style.display = 'none';
-        if (preDemoHumanWitnessInstructions) preDemoHumanWitnessInstructions.style.display = 'none';
+        // Determine if user is witness (human mode only) or interrogator (both modes)
+        const isWitness = assignedRole === 'witness' && isHumanPartner;
 
-        if (assignedRole === 'interrogator') {
-            // Interrogator instructions (same for both modes)
-            if (preDemoInterrogatorInstructions) {
-                preDemoInterrogatorInstructions.style.display = 'block';
+        // Show/hide content based on role
+        const interrogatorContents = document.querySelectorAll('.instruction-content.interrogator-content');
+        const witnessContents = document.querySelectorAll('.instruction-content.witness-content');
+
+        interrogatorContents.forEach(el => {
+            el.style.display = isWitness ? 'none' : 'block';
+        });
+        witnessContents.forEach(el => {
+            el.style.display = isWitness ? 'block' : 'none';
+        });
+
+        // Populate style name for witness
+        if (isWitness && assignedSocialStyle) {
+            if (preDemoStyleNameSpan) {
+                preDemoStyleNameSpan.textContent = assignedSocialStyle;
             }
-        } else if (assignedRole === 'witness' && isHumanPartner) {
-            // Human mode witness - show witness-specific instructions with style name
-            if (preDemoHumanWitnessInstructions) {
-                preDemoHumanWitnessInstructions.style.display = 'block';
-                // Populate the style name
-                if (preDemoStyleNameSpan && assignedSocialStyle) {
-                    preDemoStyleNameSpan.textContent = assignedSocialStyle;
-                }
-            }
+            preDemoStyleNameRepeatSpans.forEach(span => {
+                span.textContent = assignedSocialStyle;
+            });
         }
-        // Note: AI mode witness doesn't exist (AI mode only has interrogators)
+
+        // Reset to page 1
+        currentInstructionPage = 1;
+        updateInstructionPage();
 
         logToRailway({
             type: 'PRE_DEMO_INSTRUCTIONS_SHOWN',
-            message: 'Pre-demographics instructions displayed',
+            message: 'Pre-demographics instructions displayed (paginated)',
             context: {
                 role: assignedRole,
                 isHumanPartner: isHumanPartner,
-                socialStyle: assignedSocialStyle
+                socialStyle: assignedSocialStyle,
+                totalPages: totalInstructionPages
             }
+        });
+    }
+
+    // Update which instruction page is visible and navigation state
+    function updateInstructionPage() {
+        // Show/hide pages
+        instructionPages.forEach((page, index) => {
+            page.style.display = (index + 1 === currentInstructionPage) ? 'block' : 'none';
+        });
+
+        // Update page indicator
+        if (instructionPageIndicator) {
+            instructionPageIndicator.textContent = `${currentInstructionPage} / ${totalInstructionPages}`;
+        }
+
+        // Update navigation buttons
+        if (instructionPrevBtn) {
+            instructionPrevBtn.style.visibility = (currentInstructionPage === 1) ? 'hidden' : 'visible';
+        }
+
+        if (instructionNextBtn) {
+            if (currentInstructionPage === totalInstructionPages) {
+                // On last page - hide Next, show Continue button
+                instructionNextBtn.style.display = 'none';
+                confirmInstructionsButton.style.display = 'block';
+            } else {
+                instructionNextBtn.style.display = 'inline-block';
+                confirmInstructionsButton.style.display = 'none';
+            }
+        }
+
+        logToRailway({
+            type: 'INSTRUCTION_PAGE_CHANGED',
+            message: `Viewing instruction page ${currentInstructionPage}/${totalInstructionPages}`,
+            context: { page: currentInstructionPage }
         });
     }
 
@@ -1861,8 +1909,29 @@ Thank you again for your participation!
         }
     });
 
+    // Instruction pagination navigation
+    if (instructionPrevBtn) {
+        instructionPrevBtn.addEventListener('click', () => {
+            if (currentInstructionPage > 1) {
+                currentInstructionPage--;
+                updateInstructionPage();
+                logUiEvent('instruction_prev_clicked', { page: currentInstructionPage });
+            }
+        });
+    }
+
+    if (instructionNextBtn) {
+        instructionNextBtn.addEventListener('click', () => {
+            if (currentInstructionPage < totalInstructionPages) {
+                currentInstructionPage++;
+                updateInstructionPage();
+                logUiEvent('instruction_next_clicked', { page: currentInstructionPage });
+            }
+        });
+    }
+
     confirmInstructionsButton.addEventListener('click', () => {
-        logUiEvent('instructions_understand_clicked');
+        logUiEvent('instructions_understand_clicked', { finalPage: currentInstructionPage });
         // Show the modal pop-up instead of the next page
         demographicsModal.style.display = 'flex';
     });
