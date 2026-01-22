@@ -642,3 +642,62 @@ button > * {
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
+
+/* Instruction Page Pagination */
+#instructions-pagination-container {
+    min-height: 300px;
+}
+
+.instruction-page {
+    padding: 10px 0;
+}
+
+.instruction-page h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 8px;
+}
+
+.instruction-content {
+    line-height: 1.6;
+}
+
+.instruction-content p {
+    margin-bottom: 12px;
+}
+
+.instruction-content ol, .instruction-content ul {
+    margin-bottom: 12px;
+    padding-left: 25px;
+}
+
+.instruction-content li {
+    margin-bottom: 6px;
+}
+
+#instruction-nav {
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+#instruction-prev-btn, #instruction-next-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#instruction-prev-btn:hover, #instruction-next-btn:hover {
+    background-color: #0056b3;
+}
+
+#instruction-page-indicator {
+    font-weight: bold;
+    color: #666;
+}
