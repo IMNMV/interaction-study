@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userMessageInput = document.getElementById('user-message-input');
     const sendMessageButton = document.getElementById('send-message-button');
     const typingIndicator = document.getElementById('typing-indicator');
+    const aiRetryBanner = document.getElementById('ai-retry-banner'); // Banner shown during API retries (AI mode only)
     const chatInputContainer = document.getElementById('chat-input-container'); // Div containing text input and send button
 
     const confidenceSlider = document.getElementById('confidence-slider');
@@ -2539,6 +2540,16 @@ Thank you again for your participation!
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
+                // Show retry banner for AI mode only (after first attempt fails)
+                if (attempt > 1 && !isHumanPartner && aiRetryBanner) {
+                    aiRetryBanner.style.display = 'block';
+                    logToRailway({
+                        type: 'AI_RETRY_BANNER_SHOWN',
+                        message: `Showing retry banner (attempt ${attempt}/${maxRetries})`,
+                        context: { attempt: attempt }
+                    });
+                }
+
                 // Log retry attempt to Railway
                 logToRailway({
                     type: 'API_REQUEST_ATTEMPT',
@@ -2553,9 +2564,8 @@ Thank you again for your participation!
                 });
 
                 // Create AbortController for timeout
-                // NEW: Reduced timeout to 60 seconds to prevent excessive waits
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout (reduced from 120s)
+                const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 seconds timeout
 
                 const response = await fetch('/send_message', {
                     method: 'POST',
@@ -2568,16 +2578,21 @@ Thank you again for your participation!
                     }),
                     signal: controller.signal
                 });
-                
+
                 clearTimeout(timeoutId);
                 const result = await response.json();
 
                 if (response.ok) {
+                    // Hide retry banner on success
+                    if (aiRetryBanner) {
+                        aiRetryBanner.style.display = 'none';
+                    }
+
                     // Calculate network delay for successful response
                     const apiCallEndTime = Date.now();
                     const networkDelayMs = apiCallEndTime - apiCallStartTime;
                     const networkDelaySeconds = networkDelayMs / 1000;
-                    
+
                     // Success - log and return with network delay
                     logToRailway({
                         type: 'API_RESPONSE_SUCCESS',
@@ -2604,7 +2619,13 @@ Thank you again for your participation!
                             attempt: attempt
                         }
                     });
-                    if (attempt === maxRetries) throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                    if (attempt === maxRetries) {
+                        // Hide retry banner before throwing
+                        if (aiRetryBanner) {
+                            aiRetryBanner.style.display = 'none';
+                        }
+                        throw new Error(`API error after ${maxRetries} attempts: ${response.status}`);
+                    }
                 }
             } catch (error) {
                 // Network/fetch error - log and continue to retry
@@ -2618,8 +2639,14 @@ Thank you again for your participation!
                         max_retries: maxRetries
                     }
                 });
-                if (attempt === maxRetries) throw error;
-                
+                if (attempt === maxRetries) {
+                    // Hide retry banner before throwing
+                    if (aiRetryBanner) {
+                        aiRetryBanner.style.display = 'none';
+                    }
+                    throw error;
+                }
+
                 // No delay - retry immediately
             }
         }
