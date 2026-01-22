@@ -2473,7 +2473,9 @@ Thank you again for your participation!
         // NEW: Hide slider thumb initially to avoid bias from previous round
         confidenceSlider.classList.add('pristine');
 
-        confidenceStartTime = Date.now(); // Start tracking confidence slider timing
+        // Don't set confidenceStartTime here - let mousedown/touchstart set it on first actual touch
+        // This ensures clicking directly on any position (including 50%) registers as valid interaction
+        confidenceStartTime = null;
         sliderInteractionLog = []; // Reset slider interaction log
         submitRatingButton.disabled = false; // Enable submit button
     }
@@ -2484,7 +2486,8 @@ Thank you again for your participation!
         confidenceSlider.classList.remove('pristine');
 
         const baseMs = tsToMs(aiResponseTimestamp);
-        if (!confidenceStartTime && baseMs) {
+        // Always log on first touch (when confidenceStartTime is null)
+        if (confidenceStartTime === null && baseMs) {
             confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
@@ -2500,7 +2503,8 @@ Thank you again for your participation!
         confidenceSlider.classList.remove('pristine');
 
         const baseMs = tsToMs(aiResponseTimestamp);
-        if (!confidenceStartTime && baseMs) {
+        // Always log on first touch (when confidenceStartTime is null)
+        if (confidenceStartTime === null && baseMs) {
             confidenceStartTime = Date.now();
             sliderInteractionLog.push({
                 event: 'slider_first_touch',
