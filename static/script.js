@@ -850,24 +850,25 @@ document.addEventListener('DOMContentLoaded', () => {
             page.style.display = (index + 1 === currentPostDemoPage) ? 'block' : 'none';
         });
 
-        // Update page indicator
-        if (postDemoPageIndicator) {
-            postDemoPageIndicator.textContent = `${currentPostDemoPage} / ${totalPostDemoPages}`;
-        }
+        const postDemoNav = document.getElementById('post-demo-nav');
 
-        // Update navigation buttons
-        if (postDemoPrevBtn) {
-            postDemoPrevBtn.style.visibility = (currentPostDemoPage === 1) ? 'hidden' : 'visible';
-        }
+        if (currentPostDemoPage === totalPostDemoPages) {
+            // Last page - hide entire nav bar, show centered Enter Waiting Room button
+            if (postDemoNav) postDemoNav.style.display = 'none';
+            enterWaitingRoomButton.style.display = 'block';
+        } else {
+            // Not last page - show nav bar, hide Enter Waiting Room
+            if (postDemoNav) postDemoNav.style.display = 'flex';
+            enterWaitingRoomButton.style.display = 'none';
 
-        if (postDemoNextBtn) {
-            if (currentPostDemoPage === totalPostDemoPages) {
-                // On last page - hide Next, show Enter Waiting Room button
-                postDemoNextBtn.style.display = 'none';
-                enterWaitingRoomButton.style.display = 'block';
-            } else {
-                postDemoNextBtn.style.display = 'inline-block';
-                enterWaitingRoomButton.style.display = 'none';
+            // Update page indicator
+            if (postDemoPageIndicator) {
+                postDemoPageIndicator.textContent = `${currentPostDemoPage} / ${totalPostDemoPages}`;
+            }
+
+            // Update Back button
+            if (postDemoPrevBtn) {
+                postDemoPrevBtn.style.visibility = (currentPostDemoPage === 1) ? 'hidden' : 'visible';
             }
         }
 
