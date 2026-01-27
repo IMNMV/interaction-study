@@ -74,8 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const roleAssignmentPhaseDiv = document.getElementById('role-assignment-phase');
     const waitingRoomPhaseDiv = document.getElementById('waiting-room-phase');
     const assignedRoleTitleSpan = document.getElementById('assigned-role-title');
-    const interrogatorInstructionsDiv = document.getElementById('interrogator-instructions');
-    const witnessInstructionsDiv = document.getElementById('witness-instructions');
     const enterWaitingRoomButton = document.getElementById('enter-waiting-room-button');
 
     // Pre-demographics instruction elements (paginated)
@@ -87,6 +85,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const preDemoStyleNameRepeatSpans = document.querySelectorAll('.pre-demo-style-name-repeat');
     let currentInstructionPage = 1;
     const totalInstructionPages = 3;
+
+    // Post-demographics instruction elements (paginated)
+    const postDemoPages = document.querySelectorAll('.post-demo-instruction-page');
+    const postDemoPrevBtn = document.getElementById('post-demo-prev-btn');
+    const postDemoNextBtn = document.getElementById('post-demo-next-btn');
+    const postDemoPageIndicator = document.getElementById('post-demo-page-indicator');
+    let currentPostDemoPage = 1;
+    const totalPostDemoPages = 3;
     const waitingStatusP = document.getElementById('waiting-status');
     const elapsedTimeSpan = document.getElementById('elapsed-time');
     const waitingTimeoutWarningDiv = document.getElementById('waiting-timeout-warning');
@@ -744,9 +750,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showMainPhase('role-assignment'); // Reuse same phase
         assignedRoleTitleSpan.textContent = 'READY TO JOIN';
         // Hide both instruction sets
-        interrogatorInstructionsDiv.style.display = 'none';
-        witnessInstructionsDiv.style.display = 'none';
-        // Button text stays "Enter Waiting Room"
+        document.querySelectorAll('.interrogator-post-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.witness-post-content').forEach(el => el.style.display = 'none');
+        // Hide pagination, show button directly
+        document.getElementById('post-demo-instructions-container').style.display = 'none';
+        enterWaitingRoomButton.style.display = 'block';
     }
 
     // Show the correct pre-demographics instructions based on role and mode (paginated)
@@ -823,6 +831,41 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'INSTRUCTION_PAGE_CHANGED',
             message: `Viewing instruction page ${currentInstructionPage}/${totalInstructionPages}`,
             context: { page: currentInstructionPage }
+        });
+    }
+
+    // Update which post-demo instruction page is visible and navigation state
+    function updatePostDemoPage() {
+        // Show/hide pages
+        postDemoPages.forEach((page, index) => {
+            page.style.display = (index + 1 === currentPostDemoPage) ? 'block' : 'none';
+        });
+
+        // Update page indicator
+        if (postDemoPageIndicator) {
+            postDemoPageIndicator.textContent = `${currentPostDemoPage} / ${totalPostDemoPages}`;
+        }
+
+        // Update navigation buttons
+        if (postDemoPrevBtn) {
+            postDemoPrevBtn.style.visibility = (currentPostDemoPage === 1) ? 'hidden' : 'visible';
+        }
+
+        if (postDemoNextBtn) {
+            if (currentPostDemoPage === totalPostDemoPages) {
+                // On last page - hide Next, show Enter Waiting Room button
+                postDemoNextBtn.style.display = 'none';
+                enterWaitingRoomButton.style.display = 'block';
+            } else {
+                postDemoNextBtn.style.display = 'inline-block';
+                enterWaitingRoomButton.style.display = 'none';
+            }
+        }
+
+        logToRailway({
+            type: 'POST_DEMO_PAGE_CHANGED',
+            message: `Viewing post-demo instruction page ${currentPostDemoPage}/${totalPostDemoPages}`,
+            context: { page: currentPostDemoPage }
         });
     }
 
@@ -941,13 +984,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         assignedRoleTitleSpan.textContent = role.toUpperCase();
 
-        if (role === 'interrogator') {
-            interrogatorInstructionsDiv.style.display = 'block';
-            witnessInstructionsDiv.style.display = 'none';
-        } else {
-            interrogatorInstructionsDiv.style.display = 'none';
-            witnessInstructionsDiv.style.display = 'block';
-        }
+        // Show/hide role-specific content across all post-demo pages
+        document.querySelectorAll('.interrogator-post-content').forEach(el => {
+            el.style.display = (role === 'interrogator') ? 'block' : 'none';
+        });
+        document.querySelectorAll('.witness-post-content').forEach(el => {
+            el.style.display = (role === 'witness') ? 'block' : 'none';
+        });
+
+        // Reset to page 1
+        currentPostDemoPage = 1;
+        updatePostDemoPage();
 
         logUiEvent('role_assigned', { role: role });
     }
@@ -1944,6 +1991,27 @@ Thank you again for your participation!
         showMainPhase('initial'); // Now, show the demographics page
     });
 
+    // Post-demographics instruction pagination navigation
+    if (postDemoPrevBtn) {
+        postDemoPrevBtn.addEventListener('click', () => {
+            if (currentPostDemoPage > 1) {
+                currentPostDemoPage--;
+                updatePostDemoPage();
+                logUiEvent('post_demo_prev_clicked', { page: currentPostDemoPage });
+            }
+        });
+    }
+
+    if (postDemoNextBtn) {
+        postDemoNextBtn.addEventListener('click', () => {
+            if (currentPostDemoPage < totalPostDemoPages) {
+                currentPostDemoPage++;
+                updatePostDemoPage();
+                logUiEvent('post_demo_next_clicked', { page: currentPostDemoPage });
+            }
+        });
+    }
+
     finalInstructionsButton.addEventListener('click', async () => {
         logUiEvent('final_instructions_understand_clicked');
         logToRailway({
@@ -1990,11 +2058,10 @@ Thank you again for your participation!
             // NOW enter waiting room (handles both AI and human partner modes)
             await enterWaitingRoom();
 
-            // After enterWaitingRoom sets isHumanPartner, proceed with appropriate flow
+            // After enterWaitingRoom sets isHumanPartner, show role-assignment with 3-page instructions
             if (isHumanPartner) {
-                // HUMAN MODE: Assign role + go to waiting room
+                // HUMAN MODE: Get role assignment first, then show instructions
                 try {
-                    // Call backend to assign role atomically
                     const roleResponse = await fetch('/join_waiting_room', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2006,10 +2073,9 @@ Thank you again for your participation!
                         throw new Error(roleResult.detail || 'Failed to assign role');
                     }
 
-                    // Role assigned
                     currentRole = roleResult.role;
 
-                    // NEW: If witness, populate social style instructions
+                    // If witness, populate social style instructions
                     if (currentRole === 'witness' && roleResult.social_style) {
                         witnessStyleNameSpan.textContent = roleResult.social_style;
                         if (witnessStyleName2Span) witnessStyleName2Span.textContent = roleResult.social_style;
@@ -2026,35 +2092,13 @@ Thank you again for your participation!
                     }
 
                     logToRailway({
-                        type: 'ROLE_ASSIGNED_ON_I_UNDERSTAND',
-                        message: 'Role assigned when "I understand" clicked',
+                        type: 'ROLE_ASSIGNED_SHOWING_POST_DEMO_INSTRUCTIONS',
+                        message: 'Role assigned - showing 3-page post-demo instructions',
                         context: { role: currentRole }
                     });
 
-                    // Go to waiting room immediately
-                    showMainPhase('waiting-room');
-
-                    // Show role instructions IN waiting room (with social style for witnesses)
-                    showRoleInstructionsInWaitingRoom(
-                        currentRole,
-                        roleResult.social_style,
-                        roleResult.social_style_description
-                    );
-
-                    // Start 10-second timer
-                    window.instructionsShownAt = Date.now();
-
-                    // Set user as ready (they've read instructions and clicked "I understand")
-                    isUserReady = true;
-
-                    logToRailway({
-                        type: 'HUMAN_MODE_USER_READY',
-                        message: 'Human mode - setting isUserReady to true after instructions',
-                        context: { isBackendReady, isUserReady: true }
-                    });
-
-                    // Start polling for match automatically
-                    startMatchPolling();
+                    // Show 3-page post-demo instructions
+                    showRoleAssignment(currentRole);
 
                 } catch (error) {
                     logToRailway({
@@ -2065,21 +2109,16 @@ Thank you again for your participation!
                     showError('Failed to start matching. Please refresh and try again.');
                 }
             } else {
-                // AI MODE: Set flags and proceed as before
-                isUserReady = true;
+                // AI MODE: Show 3-page post-demo instructions as interrogator
                 currentRole = 'interrogator';
 
                 logToRailway({
-                    type: 'AI_MODE_I_UNDERSTAND',
-                    message: 'AI mode - setting isUserReady to true',
-                    context: { isBackendReady, isUserReady }
+                    type: 'AI_MODE_SHOWING_POST_DEMO_INSTRUCTIONS',
+                    message: 'AI mode - showing 3-page post-demo instructions',
+                    context: { role: currentRole }
                 });
 
-                // Show waiting room briefly before match
-                showMainPhase('waiting-room');
-
-                // Simulate finding AI partner
-                simulateAIMatch();
+                showRoleAssignment('interrogator');
             }
 
         } catch (error) {
@@ -2280,75 +2319,46 @@ Thank you again for your participation!
         }, 2000);
     });
 
-    // OLD: "Enter Waiting Room" button - NO LONGER USED
-    // Role assignment now happens when "I understand" is clicked
-    // Keeping this for backward compatibility but should never be triggered
+    // "Enter Waiting Room" button - shown on page 3 of post-demo instructions
     enterWaitingRoomButton.addEventListener('click', async () => {
         logUiEvent('enter_waiting_room_clicked');
         logToRailway({
-            type: 'ENTER_WAITING_ROOM_BUTTON_CLICKED_LEGACY',
-            message: '⚠️ LEGACY: "Enter Waiting Room" button clicked (should not happen in new flow)',
-            context: { isHumanPartner }
+            type: 'ENTER_WAITING_ROOM_CLICKED',
+            message: 'Enter Waiting Room clicked after post-demo instructions',
+            context: { isHumanPartner, role: currentRole }
         });
+
         showMainPhase('waiting-room');
 
         if (isHumanPartner) {
+            // HUMAN MODE: Role already assigned, go to waiting room + start polling
+            isUserReady = true;
+
             logToRailway({
-                type: 'STARTING_REAL_MATCH_POLLING',
-                message: 'Starting real match polling (HUMAN_WITNESS mode)',
-                context: {}
+                type: 'HUMAN_MODE_ENTERING_WAITING_ROOM',
+                message: 'Human mode - entering waiting room after post-demo instructions',
+                context: { role: currentRole, isUserReady: true }
             });
-            // Call backend to assign role + mark as waiting + attempt match
-            try {
-                const response = await fetch('/join_waiting_room', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                const result = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(result.detail || 'Failed to join waiting room');
-                }
+            // Show role instructions IN waiting room as reminder
+            showRoleInstructionsInWaitingRoom(currentRole);
 
-                // NOW we have the role assigned
-                currentRole = result.role;
+            // Start 10-second minimum timer
+            window.instructionsShownAt = Date.now();
 
-                logToRailway({
-                    type: 'ROLE_ASSIGNED_IN_WAITING_ROOM',
-                    message: 'Role assigned atomically',
-                    context: { role: currentRole }
-                });
-
-                // Show role-specific instructions IN the waiting room (with social style for witnesses)
-                showRoleInstructionsInWaitingRoom(
-                    currentRole,
-                    result.social_style,
-                    result.social_style_description
-                );
-
-                // Start 10-second minimum timer
-                window.instructionsShownAt = Date.now();
-
-                // FIXED BUG #1: Only start polling if role assignment succeeded
-                startMatchPolling();
-
-            } catch (error) {
-                logToRailway({
-                    type: 'JOIN_WAITING_ROOM_ERROR',
-                    message: `Failed to join waiting room: ${error.message}`,
-                    context: { error: error }
-                });
-                // TODO: Show error to user - for now, waiting room will appear frozen
-                showError('Failed to join waiting room. Please refresh and try again.');
-            }
+            // Start polling for match
+            startMatchPolling();
         } else {
+            // AI MODE: Go to waiting room + simulate match
+            isUserReady = true;
+
             logToRailway({
-                type: 'STARTING_SIMULATED_MATCH',
-                message: 'Starting simulated match (AI_WITNESS mode)',
-                context: {}
+                type: 'AI_MODE_ENTERING_WAITING_ROOM',
+                message: 'AI mode - entering waiting room after post-demo instructions',
+                context: { isUserReady: true }
             });
-            // AI_WITNESS mode - simulate finding a match after 5-10 seconds
+
+            // Simulate finding AI partner
             simulateAIMatch();
         }
     });
