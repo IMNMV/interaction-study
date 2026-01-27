@@ -479,43 +479,101 @@
                 </h1>
             </div>
 
-            <div id="interrogator-instructions" style="display: none;">
-                <h3>Your Task</h3>
-                <p>You are the <strong>INTERROGATOR</strong>.</p>
-                <p>Your job is to determine if the witness is human or AI through conversation.</p>
-                <ul>
-                    <li><strong>You will send the first message</strong></li>
-                    <li>Ask questions to figure out if they're human or AI</li>
-                    <li>After each of their messages, you'll rate your confidence</li>
-                    <li>The conversation lasts 7 minutes and 30 seconds</li>
-                    <li>You will submit the final decision</li>
-                </ul>
-            </div>
+            <!-- PAGINATED POST-DEMOGRAPHICS INSTRUCTIONS -->
+            <div id="post-demo-instructions-container">
 
-            <div id="witness-instructions" style="display: none;">
-                <h3>Your Task</h3>
-                <p>You are the <strong>WITNESS</strong>.</p>
-                <p>
-                    In a moment you will see a conversation box. Like mentioned before, your job is to simply chat with your partner. They may ask if you are an AI in which case, you can tell them you're a human.
-                </p>
-                <p>
-                    <strong>Do not lie and say you are an AI.</strong>
-                </p>
-                <p>
-                    You will chat with your partner for 7 minutes and 30 seconds. At the 7 minute 30 second mark you will be asked for a single choice question and will then provide a comment before completing the study.
-                </p>
-                <p>
-                    Response delays are expected between messages, but the total chat time will be 7 minutes and 30 seconds. If your partner leaves the chat, you will be routed to the end of the study. Please do not leave, or refresh the page as you will be disconnected.
-                </p>
+                <!-- Page 1: Your Task -->
+                <div class="post-demo-instruction-page" id="post-demo-page-1" style="display: block;">
+                    <!-- INTERROGATOR PAGE 1 -->
+                    <div class="post-demo-content interrogator-post-content" style="display: none;">
+                        <h3>Your Task</h3>
+                        <p>You are the <strong>INTERROGATOR</strong>.</p>
+                        <p>Your job is to determine if your conversation partner is human or AI through conversation.</p>
+                        <p>
+                            <strong>You will send the first message.</strong> Ask questions, make observations, and use any conversational strategy you think will help you figure out if they're human or AI.
+                        </p>
+                    </div>
+                    <!-- WITNESS PAGE 1 -->
+                    <div class="post-demo-content witness-post-content" style="display: none;">
+                        <h3>Your Task</h3>
+                        <p>You are the <strong>WITNESS</strong>.</p>
+                        <p>
+                            Your job is to simply chat with your partner using the conversational style you were assigned. They may ask if you are an AI - you can tell them you're a human.
+                        </p>
+                        <p>
+                            <strong>Do not lie and say you are an AI.</strong>
+                        </p>
+                    </div>
+                </div>
 
-                <!-- Social style reminder with examples -->
-                <div id="witness-social-style" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
-                    <p style="margin: 0;"><strong>Your style is: <span id="witness-style-name"></span></strong></p>
-                    <p style="margin: 10px 0 0 0;">Examples: <span id="witness-style-description"></span> of <span id="witness-style-name-2"></span></p>
+                <!-- Page 2: How It Works -->
+                <div class="post-demo-instruction-page" id="post-demo-page-2" style="display: none;">
+                    <!-- INTERROGATOR PAGE 2 -->
+                    <div class="post-demo-content interrogator-post-content" style="display: none;">
+                        <h3>How It Works</h3>
+                        <p><strong>After each message from your partner, you'll answer two questions:</strong></p>
+                        <ol>
+                            <li><strong>Right now, what's your best guess?</strong> (Human / AI)
+                                <ul>
+                                    <li>This isn't a final answer, just where you're leaning at this moment.</li>
+                                    <li><em>Make sure you're ready before selecting - once you click, it moves on.</em></li>
+                                </ul>
+                            </li>
+                            <li><strong>How confident are you in that guess?</strong> (0-100%)
+                                <ul>
+                                    <li>0% = completely guessing, 50% = somewhat confident, 100% = completely certain</li>
+                                </ul>
+                            </li>
+                        </ol>
+                        <p>The conversation lasts <strong>7 minutes and 30 seconds</strong>. At the end, you'll submit your final decision.</p>
+                    </div>
+                    <!-- WITNESS PAGE 2 -->
+                    <div class="post-demo-content witness-post-content" style="display: none;">
+                        <h3>Your Conversation Style</h3>
+                        <div id="witness-social-style-page2" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+                            <p style="margin: 0;"><strong>Your style is: <span id="witness-style-name"></span></strong></p>
+                            <p style="margin: 10px 0 0 0;"><span id="witness-style-description"></span></p>
+                        </div>
+                        <p>
+                            The conversation lasts <strong>7 minutes and 30 seconds</strong>. At the end, you will be asked a single question and provide a comment before completing the study.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Page 3: Important Reminders -->
+                <div class="post-demo-instruction-page" id="post-demo-page-3" style="display: none;">
+                    <!-- INTERROGATOR PAGE 3 -->
+                    <div class="post-demo-content interrogator-post-content" style="display: none;">
+                        <h3>Important Reminders</h3>
+                        <ul>
+                            <li>You can change your mind as many times as you want across turns</li>
+                            <li>We're interested in how your impression evolves over the conversation</li>
+                            <li><strong>Do not refresh the page</strong> - you may lose your connection</li>
+                            <li>Response delays are normal between messages</li>
+                        </ul>
+                        <p><strong>Good luck!</strong></p>
+                    </div>
+                    <!-- WITNESS PAGE 3 -->
+                    <div class="post-demo-content witness-post-content" style="display: none;">
+                        <h3>Important Reminders</h3>
+                        <ul>
+                            <li>Try to maintain your <strong><span id="witness-style-name-2"></span></strong> style throughout</li>
+                            <li><strong>Do not refresh the page</strong> - you may lose your connection</li>
+                            <li>Response delays are normal between messages</li>
+                            <li>If your partner leaves, you will be routed to the end of the study</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div id="post-demo-nav" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                    <button type="button" id="post-demo-prev-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; visibility: hidden;">← Back</button>
+                    <span id="post-demo-page-indicator" style="font-size: 14px; color: #666;">1 / 3</span>
+                    <button type="button" id="post-demo-next-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Next →</button>
                 </div>
             </div>
 
-            <button id="enter-waiting-room-button" class="cta-button">Enter Waiting Room</button>
+            <button id="enter-waiting-room-button" class="cta-button" style="display: none; margin-top: 15px;">Enter Waiting Room</button>
         </div>
 
         <!-- NEW: Waiting Room Phase -->
