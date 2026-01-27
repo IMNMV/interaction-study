@@ -852,24 +852,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const postDemoNav = document.getElementById('post-demo-nav');
 
+        // Update page indicator
+        if (postDemoPageIndicator) {
+            postDemoPageIndicator.textContent = `${currentPostDemoPage} / ${totalPostDemoPages}`;
+        }
+
+        // Update Back button
+        if (postDemoPrevBtn) {
+            postDemoPrevBtn.style.visibility = (currentPostDemoPage === 1) ? 'hidden' : 'visible';
+        }
+
         if (currentPostDemoPage === totalPostDemoPages) {
-            // Last page - hide entire nav bar, show centered Enter Waiting Room button
-            if (postDemoNav) postDemoNav.style.display = 'none';
+            // Last page - hide Next, show centered Enter Waiting Room button
+            if (postDemoNextBtn) postDemoNextBtn.style.display = 'none';
             enterWaitingRoomButton.style.display = 'block';
         } else {
-            // Not last page - show nav bar, hide Enter Waiting Room
-            if (postDemoNav) postDemoNav.style.display = 'flex';
+            // Not last page - show Next, hide Enter Waiting Room
+            if (postDemoNextBtn) postDemoNextBtn.style.display = 'inline-block';
             enterWaitingRoomButton.style.display = 'none';
-
-            // Update page indicator
-            if (postDemoPageIndicator) {
-                postDemoPageIndicator.textContent = `${currentPostDemoPage} / ${totalPostDemoPages}`;
-            }
-
-            // Update Back button
-            if (postDemoPrevBtn) {
-                postDemoPrevBtn.style.visibility = (currentPostDemoPage === 1) ? 'hidden' : 'visible';
-            }
         }
 
         logToRailway({
@@ -2022,134 +2022,11 @@ Thank you again for your participation!
         });
     }
 
-    finalInstructionsButton.addEventListener('click', async () => {
-        logUiEvent('final_instructions_understand_clicked');
-        logToRailway({
-            type: 'I_UNDERSTAND_CLICKED',
-            message: '"I understand" button clicked - NOW starting initialization',
-            context: {}
-        });
-
-        // Hide the modal
-        finalInstructionsModal.style.display = 'none';
-
-        // Get the pending form data
-        const data = window.pendingStudyData;
-        if (!data) {
-            showError('No form data found. Please refresh and try again.');
-            return;
-        }
-
-        // NOW perform initialization (after user clicked "I understand")
-        try {
-            const response = await fetch('/initialize_study', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(getApiErrorMessage(result, 'Failed to initialize study.'));
-            }
-
-            // --- FULL, RESTORED SESSION SETUP LOGIC ---
-            sessionId = result.session_id;
-            localStorage.setItem('sessionId', sessionId);
-            currentTurn = 0;
-            messageList.innerHTML = '';
-
-            // Activate the early exit listeners now that the study has officially begun
-            if (isProduction) {
-                window.addEventListener('beforeunload', handleEarlyExit); // Warning dialog
-                window.addEventListener('unload', handleActualExit); // Actual exit tracking
-            }
-
-            // NOW enter waiting room (handles both AI and human partner modes)
-            await enterWaitingRoom();
-
-            // After enterWaitingRoom sets isHumanPartner, show role-assignment with 3-page instructions
-            if (isHumanPartner) {
-                // HUMAN MODE: Get role assignment first, then show instructions
-                try {
-                    const roleResponse = await fetch('/join_waiting_room', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: sessionId })
-                    });
-                    const roleResult = await roleResponse.json();
-
-                    if (!roleResponse.ok) {
-                        throw new Error(roleResult.detail || 'Failed to assign role');
-                    }
-
-                    currentRole = roleResult.role;
-
-                    // If witness, populate social style instructions
-                    if (currentRole === 'witness' && roleResult.social_style) {
-                        witnessStyleNameSpan.textContent = roleResult.social_style;
-                        if (witnessStyleName2Span) witnessStyleName2Span.textContent = roleResult.social_style;
-                        witnessStyleDescriptionP.textContent = roleResult.social_style_description;
-
-                        logToRailway({
-                            type: 'WITNESS_SOCIAL_STYLE_ASSIGNED',
-                            message: 'Witness assigned social style',
-                            context: {
-                                style: roleResult.social_style,
-                                description: roleResult.social_style_description
-                            }
-                        });
-                    }
-
-                    logToRailway({
-                        type: 'ROLE_ASSIGNED_SHOWING_POST_DEMO_INSTRUCTIONS',
-                        message: 'Role assigned - showing 3-page post-demo instructions',
-                        context: { role: currentRole }
-                    });
-
-                    // Show 3-page post-demo instructions
-                    showRoleAssignment(currentRole);
-
-                } catch (error) {
-                    logToRailway({
-                        type: 'ROLE_ASSIGNMENT_ERROR',
-                        message: `Failed to assign role: ${error.message}`,
-                        context: { error: error }
-                    });
-                    showError('Failed to start matching. Please refresh and try again.');
-                }
-            } else {
-                // AI MODE: Show 3-page post-demo instructions as interrogator
-                currentRole = 'interrogator';
-
-                logToRailway({
-                    type: 'AI_MODE_SHOWING_POST_DEMO_INSTRUCTIONS',
-                    message: 'AI mode - showing 3-page post-demo instructions',
-                    context: { role: currentRole }
-                });
-
-                showRoleAssignment('interrogator');
-            }
-
-        } catch (error) {
-            // This block runs if any part of the 'try' block fails
-            logToRailway({
-                type: 'INITIALIZATION_ERROR',
-                message: `Study initialization failed: ${error.message}`,
-                context: { error: error }
-            });
-            finalInstructionsModal.style.display = 'none';
-            const formButton = initialForm.querySelector('button');
-            if (formButton) formButton.disabled = false;
-            // Unlock the form so the participant can correct inputs
-            setInitialFormControlsDisabled(false);
-            showError('Failed to initialize study. Please refresh and try again.');
-        }
-    });
+    // finalInstructionsButton handler removed - initialization now happens directly on form submit
     // --- Event Listeners ---
     // handleEarlyExit already declared above, no need to redeclare
 
-    initialForm.addEventListener('submit', (e) => {
+    initialForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         logUiEvent('initial_form_begin_conversation_clicked');
 
@@ -2265,21 +2142,112 @@ Thank you again for your participation!
             context: { isBackendReady, isUserReady }
         });
 
-        // Show the final instructions pop-up
-        logToRailway({
-            type: 'SHOWING_INSTRUCTIONS_MODAL',
-            message: 'Showing final instructions modal',
-            context: {}
-        });
-        finalInstructionsModal.style.display = 'flex';
-
-        // NO LOADING BAR - The waiting room IS the loading screen
+        // Disable form while initializing
         initialForm.querySelector('button').disabled = true;
-        // Lock all demographics controls after capturing values
         setInitialFormControlsDisabled(true);
 
-        // Store the form data to be used when "I understand" is clicked
-        window.pendingStudyData = data;
+        logToRailway({
+            type: 'FORM_SUBMITTED_INITIALIZING',
+            message: 'Form submitted - initializing study directly (no modal)',
+            context: {}
+        });
+
+        // Perform initialization directly (skip modal)
+        try {
+            const response = await fetch('/initialize_study', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(getApiErrorMessage(result, 'Failed to initialize study.'));
+            }
+
+            sessionId = result.session_id;
+            localStorage.setItem('sessionId', sessionId);
+            currentTurn = 0;
+            messageList.innerHTML = '';
+
+            if (isProduction) {
+                window.addEventListener('beforeunload', handleEarlyExit);
+                window.addEventListener('unload', handleActualExit);
+            }
+
+            // Determine AI vs human mode
+            await enterWaitingRoom();
+
+            // Show 3-page post-demo instructions
+            if (isHumanPartner) {
+                try {
+                    const roleResponse = await fetch('/join_waiting_room', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                    const roleResult = await roleResponse.json();
+
+                    if (!roleResponse.ok) {
+                        throw new Error(roleResult.detail || 'Failed to assign role');
+                    }
+
+                    currentRole = roleResult.role;
+
+                    if (currentRole === 'witness' && roleResult.social_style) {
+                        witnessStyleNameSpan.textContent = roleResult.social_style;
+                        if (witnessStyleName2Span) witnessStyleName2Span.textContent = roleResult.social_style;
+                        witnessStyleDescriptionP.textContent = roleResult.social_style_description;
+
+                        logToRailway({
+                            type: 'WITNESS_SOCIAL_STYLE_ASSIGNED',
+                            message: 'Witness assigned social style',
+                            context: {
+                                style: roleResult.social_style,
+                                description: roleResult.social_style_description
+                            }
+                        });
+                    }
+
+                    logToRailway({
+                        type: 'ROLE_ASSIGNED_SHOWING_POST_DEMO_INSTRUCTIONS',
+                        message: 'Role assigned - showing 3-page post-demo instructions',
+                        context: { role: currentRole }
+                    });
+
+                    showRoleAssignment(currentRole);
+
+                } catch (error) {
+                    logToRailway({
+                        type: 'ROLE_ASSIGNMENT_ERROR',
+                        message: `Failed to assign role: ${error.message}`,
+                        context: { error: error }
+                    });
+                    showError('Failed to start matching. Please refresh and try again.');
+                }
+            } else {
+                currentRole = 'interrogator';
+
+                logToRailway({
+                    type: 'AI_MODE_SHOWING_POST_DEMO_INSTRUCTIONS',
+                    message: 'AI mode - showing 3-page post-demo instructions',
+                    context: { role: currentRole }
+                });
+
+                showRoleAssignment('interrogator');
+            }
+
+        } catch (error) {
+            logToRailway({
+                type: 'INITIALIZATION_ERROR',
+                message: `Study initialization failed: ${error.message}`,
+                context: { error: error }
+            });
+            const formButton = initialForm.querySelector('button');
+            if (formButton) formButton.disabled = false;
+            setInitialFormControlsDisabled(false);
+            showError('Failed to initialize study. Please refresh and try again.');
+        }
     });
     
     // *** FIX: ADDING THE MISSING EVENT LISTENERS BACK ***
