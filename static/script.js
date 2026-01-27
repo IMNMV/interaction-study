@@ -545,8 +545,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentRole === 'witness' && isHumanPartner && assignedSocialStyle && assignedSocialStyleDescription) {
                 // Show style instructions for witness
                 conversationHeader.innerHTML = `<strong>Style: ${assignedSocialStyle}</strong><br><span style="font-size: 0.9em; font-weight: normal;">${assignedSocialStyleDescription}</span>`;
+            } else if (currentRole === 'interrogator') {
+                // Interrogator: show task reminder with randomized order
+                const humanFirst = Math.random() < 0.5;
+                const promptOrder = humanFirst ? 'human_first' : 'ai_first';
+                const taskText = humanFirst
+                    ? 'Your task: Determine if your partner is human or AI.'
+                    : 'Your task: Determine if your partner is AI or human.';
+                conversationHeader.innerHTML = `<span style="font-size: 0.9em;">${taskText}</span>`;
+
+                logUiEvent('interrogator_prompt_order', { order: promptOrder, text: taskText });
             } else {
-                // Default header for interrogators or AI mode
                 conversationHeader.textContent = 'Conversation';
             }
 
