@@ -689,6 +689,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // START THE 7.5-MINUTE TIMER AND LOG CONVERSATION START
+            // FIX: Reset synchronizedStartTimestamp to NOW, not the backend's proceed_to_chat_at time
+            // The backend time is for synchronizing when both users SHOULD start, but we need to track
+            // when the conversation ACTUALLY starts (which may be delayed due to network, user actions, etc.)
+            synchronizedStartTimestamp = Date.now();
             startStudyTimer();
 
             // Log when conversation actually begins
