@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     : 'Determine if your partner is AI or human.';
                 conversationHeader.innerHTML = `<span style="font-size: 0.9em;"><strong>Your task:</strong> ${orderText}</span>`;
 
-                logUiEvent('interrogator_prompt_order', { order: promptOrder, text: taskText });
+                logUiEvent('interrogator_prompt_order', { order: promptOrder, text: orderText });
             } else {
                 conversationHeader.textContent = 'Conversation';
             }
@@ -1640,6 +1640,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     skipConsentDownloadButton.addEventListener('click', () => {
         logUiEvent('consent_skip_download_clicked');
+
+        // Attach beforeunload early so dropout between consent and demographics is caught
+        if (isProduction && handleEarlyExit && !earlyExitAttached) {
+            window.addEventListener('beforeunload', handleEarlyExit);
+            window.addEventListener('unload', handleActualExit);
+            earlyExitAttached = true;
+        }
+
         // If they skip download, just move to the next phase.
         showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
         showPreDemoInstructions(); // Show role/mode-specific instructions
@@ -1714,6 +1722,13 @@ By clicking "I agree" below, you indicate that:
         
         generateAndDownloadPdf(consentText, `Consent_Form_${participantId}.pdf`);
 
+        // Attach beforeunload early so dropout between consent and demographics is caught
+        if (isProduction && handleEarlyExit && !earlyExitAttached) {
+            window.addEventListener('beforeunload', handleEarlyExit);
+            window.addEventListener('unload', handleActualExit);
+            earlyExitAttached = true;
+        }
+
         // Move to the next phase after starting the download.
         showMainPhase('instructions'); // CHANGE 'initial' to 'instructions'
         showPreDemoInstructions(); // Show role/mode-specific instructions
@@ -1722,6 +1737,7 @@ By clicking "I agree" below, you indicate that:
     // --- Prolific Dropout and Completion Logic ---
     let handleEarlyExit = null; // Declare the variable first
     let handleActualExit = null; // Handler for when they actually leave
+    let earlyExitAttached = false; // Prevent double-attach
 
     if (isProduction) {
         // 1. DEFINE the function that will handle premature exits (beforeunload)
@@ -1752,7 +1768,9 @@ By clicking "I agree" below, you indicate that:
             });
 
             // Send beacon to backend IMMEDIATELY (works even as page unloads)
-            if (sessionId) {
+            // Use participantId as fallback when sessionId isn't set yet
+            // (e.g., dropout between consent and demographics submission)
+            if (sessionId || participantId) {
                 const payload = JSON.stringify({
                     session_id: sessionId,
                     participant_id: participantId,
@@ -1817,6 +1835,9 @@ Thank you again for your participation!
         `;
         generateAndDownloadPdf(debriefText, `Debrief_Form_${sessionId || participantId}.pdf`);
 
+        // Clear participantId so next session gets fresh role assignment
+        localStorage.removeItem('participantId');
+
         if (isProduction) {
             // DEACTIVATE the listeners so this final redirect isn't blocked
             window.removeEventListener('beforeunload', handleEarlyExit);
@@ -1834,6 +1855,9 @@ Thank you again for your participation!
 
     // 3. We create the event listener for the continue button.
     continueAfterDebriefButton.addEventListener('click', () => {
+        // Clear participantId so next session gets fresh role assignment
+        localStorage.removeItem('participantId');
+
         if (isProduction) {
             // DEACTIVATE the listeners before the final redirect
             window.removeEventListener('beforeunload', handleEarlyExit);
@@ -2170,9 +2194,11 @@ Thank you again for your participation!
             currentTurn = 0;
             messageList.innerHTML = '';
 
-            if (isProduction) {
+            // Attach beforeunload if not already attached (may have been attached at consent)
+            if (isProduction && !earlyExitAttached) {
                 window.addEventListener('beforeunload', handleEarlyExit);
                 window.addEventListener('unload', handleActualExit);
+                earlyExitAttached = true;
             }
 
             // Determine AI vs human mode
@@ -3396,6 +3422,7 @@ Thank you again for your participation!
 
     newSessionButton.addEventListener('click', () => {
         localStorage.removeItem('sessionId');
+        localStorage.removeItem('participantId');
         sessionId = null;
         currentTurn = 0;
         aiResponseTimestamp = null;
