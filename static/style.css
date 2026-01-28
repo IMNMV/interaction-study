@@ -701,3 +701,58 @@ button > * {
     font-weight: bold;
     color: #666;
 }
+
+/* Post-demographics instruction pages - match pre-demo spacing */
+.post-demo-instruction-page {
+    padding: 10px 0;
+}
+
+.post-demo-instruction-page h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 8px;
+}
+
+.post-demo-content {
+    line-height: 1.6;
+}
+
+.post-demo-content p {
+    margin-bottom: 12px;
+}
+
+.post-demo-content ol, .post-demo-content ul {
+    margin-bottom: 12px;
+    padding-left: 25px;
+}
+
+.post-demo-content li {
+    margin-bottom: 6px;
+}
+
+#post-demo-nav {
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+#post-demo-prev-btn, #post-demo-next-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#post-demo-prev-btn:hover, #post-demo-next-btn:hover {
+    background-color: #0056b3;
+}
+
+#post-demo-page-indicator {
+    font-weight: bold;
+    color: #666;
+}
