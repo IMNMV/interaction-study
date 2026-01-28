@@ -992,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         showMainPhase('role-assignment');
 
-        assignedRoleTitleSpan.textContent = role.toUpperCase();
+        assignedRoleTitleSpan.textContent = (role === 'interrogator') ? 'DETECTIVE' : (role === 'witness') ? 'RESPONDENT' : role.toUpperCase();
 
         // Show/hide role-specific content across all post-demo pages
         document.querySelectorAll('.interrogator-post-content').forEach(el => {
