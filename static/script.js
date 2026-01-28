@@ -549,10 +549,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Interrogator: show task reminder with randomized order
                 const humanFirst = Math.random() < 0.5;
                 const promptOrder = humanFirst ? 'human_first' : 'ai_first';
-                const taskText = humanFirst
-                    ? 'Your task: Determine if your partner is human or AI.'
-                    : 'Your task: Determine if your partner is AI or human.';
-                conversationHeader.innerHTML = `<span style="font-size: 0.9em;">${taskText}</span>`;
+                const orderText = humanFirst
+                    ? 'Determine if your partner is human or AI.'
+                    : 'Determine if your partner is AI or human.';
+                conversationHeader.innerHTML = `<span style="font-size: 0.9em;"><strong>Your task:</strong> ${orderText}</span>`;
 
                 logUiEvent('interrogator_prompt_order', { order: promptOrder, text: taskText });
             } else {
