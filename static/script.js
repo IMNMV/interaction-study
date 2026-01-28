@@ -245,6 +245,88 @@ document.addEventListener('DOMContentLoaded', () => {
     let timeExpired = false;
     const STUDY_DURATION_MS = 7.5 * 60 * 1000; // 7.5 minutes in milliseconds
 
+    // TIMEOUT CONSTANTS (no screen should have user waiting >2-3 min without action)
+    const CONSENT_TIMEOUT_MS = 3 * 60 * 1000;      // 3 minutes for consent
+    const SCREEN_TIMEOUT_MS = 2 * 60 * 1000;       // 2 minutes for other screens
+    const WAITING_ROOM_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes for waiting room
+
+    // Track active screen timers so we can clear them on navigation
+    let currentScreenTimer = null;
+    let currentScreenName = null; // Track which screen timer is for
+
+    function clearScreenTimer() {
+        if (currentScreenTimer) {
+            clearTimeout(currentScreenTimer);
+            currentScreenTimer = null;
+        }
+        currentScreenName = null;
+    }
+
+    // Record timeout to database for analytics (fire-and-forget, don't block redirect)
+    async function recordTimeoutToDatabase(screenName) {
+        try {
+            await fetch('/record_timeout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    participant_id: participantId,
+                    session_id: sessionId,
+                    timeout_screen: screenName
+                })
+            });
+        } catch (e) {
+            // Silently fail - don't block the redirect
+            logToRailway({
+                type: 'RECORD_TIMEOUT_ERROR',
+                message: `Failed to record timeout: ${e.message}`,
+                context: { screen: screenName }
+            });
+        }
+    }
+
+    function startScreenTimer(timeoutMs, screenName, onTimeout) {
+        clearScreenTimer();
+        currentScreenName = screenName;
+
+        logToRailway({
+            type: 'SCREEN_TIMER_STARTED',
+            message: `Started ${timeoutMs/1000}s timer for ${screenName}`,
+            context: { screen: screenName, timeout_ms: timeoutMs }
+        });
+
+        currentScreenTimer = setTimeout(async () => {
+            logToRailway({
+                type: 'SCREEN_TIMEOUT',
+                message: `Screen timeout on ${screenName} after ${timeoutMs/1000}s`,
+                context: { screen: screenName }
+            });
+            logUiEvent('screen_timeout', { screen: screenName, timeout_ms: timeoutMs });
+
+            // Record timeout to database before executing callback
+            await recordTimeoutToDatabase(screenName);
+
+            onTimeout();
+        }, timeoutMs);
+    }
+
+    function redirectToProlificTimeout() {
+        clearScreenTimer();
+        if (isProduction) {
+            window.location.href = PROLIFIC_TIMED_OUT_URL;
+        } else {
+            alert('DEV MODE: Screen timeout - would redirect to Prolific timeout URL');
+        }
+    }
+
+    function redirectToProlificCompletion() {
+        clearScreenTimer();
+        if (isProduction) {
+            window.location.href = PROLIFIC_COMPLETION_URL;
+        } else {
+            alert('DEV MODE: Screen timeout - would redirect to Prolific completion URL');
+        }
+    }
+
     // NEW: Tab visibility tracking
     let tabHiddenStartTime = null;
     let cumulativeTabHiddenMs = 0;
@@ -625,15 +707,67 @@ document.addEventListener('DOMContentLoaded', () => {
         finalPageDiv.style.display = 'none';
         feedbackPhaseDiv.style.display = 'none';
 
+        // Clear any existing screen timer when changing phases
+        clearScreenTimer();
 
-        if (phase === 'consent') consentPhaseDiv.style.display = 'block';
-        else if (phase === 'instructions') instructionsPhaseDiv.style.display = 'block';
-        else if (phase === 'initial') initialSetupDiv.style.display = 'block';
-        else if (phase === 'role-assignment') roleAssignmentPhaseDiv.style.display = 'block'; // NEW
-        else if (phase === 'waiting-room') waitingRoomPhaseDiv.style.display = 'block'; // NEW
-        else if (phase === 'chat_and_assessment_flow') chatInterfaceDiv.style.display = 'block';
-        else if (phase === 'feedback') feedbackPhaseDiv.style.display = 'block';
-        else if (phase === 'final') finalPageDiv.style.display = 'block';
+        if (phase === 'consent') {
+            consentPhaseDiv.style.display = 'block';
+            // 3 minute timeout for consent
+            startScreenTimer(CONSENT_TIMEOUT_MS, 'consent', redirectToProlificTimeout);
+        }
+        else if (phase === 'instructions') {
+            instructionsPhaseDiv.style.display = 'block';
+            // 2 minute timeout for pre-demo instructions
+            startScreenTimer(SCREEN_TIMEOUT_MS, 'instructions', redirectToProlificTimeout);
+        }
+        else if (phase === 'initial') {
+            initialSetupDiv.style.display = 'block';
+            // 2 minute timeout for demographics
+            startScreenTimer(SCREEN_TIMEOUT_MS, 'demographics', redirectToProlificTimeout);
+        }
+        else if (phase === 'role-assignment') {
+            roleAssignmentPhaseDiv.style.display = 'block';
+            // 2 minute timeout for post-demo instructions
+            startScreenTimer(SCREEN_TIMEOUT_MS, 'role-assignment', redirectToProlificTimeout);
+        }
+        else if (phase === 'waiting-room') {
+            waitingRoomPhaseDiv.style.display = 'block';
+            // Waiting room has its own timeout logic in startMatchPolling (2 min)
+            // No need for screen timer here
+        }
+        else if (phase === 'chat_and_assessment_flow') {
+            chatInterfaceDiv.style.display = 'block';
+            // Conversation has its own 7.5 min study timer
+            // No screen timer here
+        }
+        else if (phase === 'feedback') {
+            feedbackPhaseDiv.style.display = 'block';
+            // 2 minute timeout for feedback - auto-submit and continue
+            startScreenTimer(SCREEN_TIMEOUT_MS, 'feedback', autoSubmitFeedback);
+        }
+        else if (phase === 'final') {
+            finalPageDiv.style.display = 'block';
+            // 2 minute timeout for debrief - redirect to Prolific completion
+            startScreenTimer(SCREEN_TIMEOUT_MS, 'debrief', redirectToProlificCompletion);
+        }
+    }
+
+    // Auto-submit feedback on timeout
+    function autoSubmitFeedback() {
+        logToRailway({
+            type: 'FEEDBACK_AUTO_SUBMIT',
+            message: 'Auto-submitting feedback due to timeout',
+            context: { feedback_text: feedbackTextarea.value || '(timeout - no feedback)' }
+        });
+
+        // Simulate clicking the submit button (or just proceed to next phase)
+        // If there's feedback text, submit it; otherwise just proceed
+        if (submitFeedbackButton && !submitFeedbackButton.disabled) {
+            submitFeedbackButton.click();
+        } else {
+            // No submit button or already disabled - go to debrief directly
+            showMainPhase('final');
+        }
     }
 
 
@@ -1029,6 +1163,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(`/check_match_status?session_id=${sessionId}`);
                 const result = await response.json();
 
+                // FIX BUG 1: Check if backend cleanup killed our session
+                if (result.timed_out) {
+                    clearInterval(matchCheckInterval);
+                    clearInterval(waitingTimerInterval);
+
+                    logToRailway({
+                        type: 'SESSION_CLEANED_UP_BY_BACKEND',
+                        message: `Backend cleanup marked session as ${result.cleanup_reason} - redirecting to Prolific`,
+                        context: { cleanup_reason: result.cleanup_reason }
+                    });
+
+                    logUiEvent('backend_cleanup_timeout', {
+                        cleanup_reason: result.cleanup_reason
+                    });
+
+                    // Record timeout (backend already updated session, but record screen for analytics)
+                    recordTimeoutToDatabase(`backend_cleanup_${result.cleanup_reason}`);
+
+                    // Redirect to Prolific timeout URL
+                    if (isProduction) {
+                        window.location.href = PROLIFIC_TIMED_OUT_URL;
+                    } else {
+                        alert(`DEV MODE: Backend cleanup marked session as ${result.cleanup_reason}. Would redirect to Prolific timeout URL.`);
+                    }
+                    return;
+                }
+
+                // Show "Finding new partner..." if user was re-queued after partner dropped
+                if (result.was_requeued && !result.matched) {
+                    waitingStatusP.innerHTML = '<span style="color: #ffc107; font-weight: bold;">Partner disconnected. Finding new partner...</span>';
+                }
+
                 if (result.matched) {
                     clearInterval(matchCheckInterval);
                     // DON'T stop waitingTimerInterval yet - let it keep counting until chat starts
@@ -1079,13 +1245,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Show timeout warning after 4 minutes
-                if (elapsed >= 240 && elapsed < 300) {
+                // Show timeout warning after 1.5 minutes (90 seconds)
+                if (elapsed >= 90 && elapsed < 120) {
                     waitingTimeoutWarningDiv.style.display = 'block';
                 }
 
-                // Hard timeout after 5 minutes
-                if (elapsed >= 300) {
+                // Hard timeout after 2 minutes (120 seconds)
+                if (elapsed >= 120) {
                     clearInterval(matchCheckInterval);
                     clearInterval(waitingTimerInterval); // Stop timer updates
                     handleMatchTimeout();
@@ -1100,13 +1266,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000); // Poll every 1 second
     }
 
-    function handleMatchTimeout() {
+    async function handleMatchTimeout() {
         logUiEvent('match_timeout');
 
-        waitingStatusP.innerHTML = '<span style="color: #d9534f;">Unable to find a match</span>';
-        waitingTimeoutWarningDiv.style.display = 'block';
+        waitingStatusP.innerHTML = '<span style="color: #d9534f;">Unable to find a match. Redirecting...</span>';
 
-        showError('No match found after 5 minutes. Please use the "Report Issue & Exit" button.');
+        logToRailway({
+            type: 'MATCH_TIMEOUT_REDIRECT',
+            message: 'No match found after 2 minutes - auto-redirecting to Prolific',
+            context: { role: currentRole }
+        });
+
+        // Record timeout to database
+        await recordTimeoutToDatabase('waiting_room');
+
+        // Auto-redirect to Prolific timeout URL (no need to wait for button click)
+        if (isProduction) {
+            window.location.href = PROLIFIC_TIMED_OUT_URL;
+        } else {
+            alert('DEV MODE: No match found after 2 minutes. Would redirect to Prolific timeout URL.');
+        }
     }
 
     function simulateAIMatch() {
@@ -1412,22 +1591,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handlePartnerDropout() {
+    async function handlePartnerDropout() {
         logUiEvent('partner_dropped');
-
-        // CRITICAL: Notify backend FIRST so partner's session gets marked as partner_dropped
-        // This allows partner to detect dropout when they next poll
-        fetch(`${API_BASE_URL}/report_partner_dropped`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId })
-        }).catch(err => {
-            logToRailway({
-                type: 'REPORT_PARTNER_DROPPED_ERROR',
-                message: `Failed to report partner dropout: ${err.message}`,
-                context: { session_id: sessionId }
-            });
-        });
 
         // Stop partner polling
         if (partnerPollInterval) {
@@ -1437,6 +1602,131 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Stop background dropout check if running
         stopBackgroundDropoutCheck();
+
+        // Check message count - determines if we can re-queue or need to go to final choice
+        const messageCount = messageList.childElementCount;
+
+        logToRailway({
+            type: 'PARTNER_DROPOUT_MESSAGE_CHECK',
+            message: `Partner dropped - checking message count: ${messageCount}`,
+            context: { message_count: messageCount, role: currentRole }
+        });
+
+        // Report to backend and check if we should be re-queued
+        try {
+            const response = await fetch(`${API_BASE_URL}/report_partner_dropped`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            const result = await response.json();
+
+            logToRailway({
+                type: 'REPORT_PARTNER_DROPPED_RESPONSE',
+                message: `Backend response for partner dropout`,
+                context: { result, message_count: messageCount }
+            });
+
+            // If re-queued (no messages, under 4 min total wait), go back to waiting room
+            if (result.requeued) {
+                logUiEvent('partner_dropped_requeued');
+
+                logToRailway({
+                    type: 'PARTNER_DROPPED_REQUEUED',
+                    message: 'Partner dropped but re-queued for new match - returning to waiting room',
+                    context: { role: currentRole }
+                });
+
+                // Clean up conversation state
+                if (studyTimer) {
+                    clearInterval(studyTimer);
+                    studyTimer = null;
+                }
+                document.getElementById('timer-display').style.display = 'none';
+
+                // Reset conversation UI
+                messageList.innerHTML = '';
+                partnerSessionId = null;
+                firstMessageSender = null;
+                isBackendReady = false;
+
+                // Return to waiting room with "Finding new partner..." message
+                showMainPhase('waiting-room');
+                waitingStatusP.innerHTML = '<span style="color: #ffc107; font-weight: bold;">Partner disconnected. Finding new partner...</span>';
+
+                // Show instructions again as reminder
+                showRoleInstructionsInWaitingRoom(currentRole);
+
+                // Restart match polling (will use original waiting_room_entered_at for FIFO)
+                startMatchPolling();
+                return;
+            }
+
+            // If timed out (exceeded 4 min total wait), redirect to Prolific
+            if (result.timed_out && messageCount === 0) {
+                logUiEvent('partner_dropout_timeout_exceeded');
+
+                logToRailway({
+                    type: 'PARTNER_DROPPED_TIMEOUT_EXCEEDED',
+                    message: 'Partner dropped and total wait time exceeded - redirecting to Prolific',
+                    context: { role: currentRole }
+                });
+
+                // Clean up timer
+                if (studyTimer) {
+                    clearInterval(studyTimer);
+                }
+                document.getElementById('timer-display').style.display = 'none';
+
+                // Record timeout to database
+                recordTimeoutToDatabase('partner_timeout_exceeded_total_wait');
+
+                if (isProduction) {
+                    window.location.href = PROLIFIC_TIMED_OUT_URL;
+                } else {
+                    alert('DEV MODE: Partner dropped and exceeded total wait time. Would redirect to Prolific timeout URL.');
+                }
+                return;
+            }
+
+        } catch (err) {
+            logToRailway({
+                type: 'REPORT_PARTNER_DROPPED_ERROR',
+                message: `Failed to report partner dropout: ${err.message}`,
+                context: { session_id: sessionId }
+            });
+            // Fall through to original logic on error
+        }
+
+        // If we get here with 0 messages (backend error or old logic), redirect to Prolific
+        if (messageCount === 0) {
+            // No messages exchanged - no useful data, redirect to Prolific
+            logToRailway({
+                type: 'PARTNER_DROPOUT_NO_MESSAGES',
+                message: 'Partner dropped with 0 messages - redirecting to Prolific timeout',
+                context: { role: currentRole }
+            });
+
+            logUiEvent('partner_dropout_no_messages');
+
+            // Clean up timer
+            if (studyTimer) {
+                clearInterval(studyTimer);
+            }
+            document.getElementById('timer-display').style.display = 'none';
+
+            // Record timeout to database
+            recordTimeoutToDatabase('partner_timeout_no_messages');
+
+            if (isProduction) {
+                window.location.href = PROLIFIC_TIMED_OUT_URL;
+            } else {
+                alert('DEV MODE: Partner dropped with 0 messages. Would redirect to Prolific timeout URL.');
+            }
+            return;
+        }
+
+        // ≥1 message: Continue to final choice flow (useful data collected)
 
         // Different handling based on role
         if (currentRole === 'witness') {
@@ -1919,6 +2209,23 @@ Thank you again for your participation!
         if (assessmentTitle) {
             assessmentTitle.textContent = "Your Final Assessment";
         }
+
+        // Start 2-minute timer for witness final response (auto-select if timeout)
+        startScreenTimer(SCREEN_TIMEOUT_MS, 'witness_final_response', () => {
+            logToRailway({
+                type: 'WITNESS_FINAL_RESPONSE_TIMEOUT',
+                message: 'Witness final response timed out - auto-selecting and proceeding',
+                context: { role: currentRole }
+            });
+            // Auto-select "human" (or we could randomly pick) and proceed
+            if (!binaryChoice) {
+                binaryChoice = 'human'; // Default selection on timeout
+                binaryChoiceTime = Date.now() - binaryChoiceStartTime;
+            }
+            // Route to feedback
+            showMainPhase('feedback');
+            feedbackTextarea.focus();
+        });
 
         logToRailway({
             type: 'WITNESS_BINARY_CHOICE_SHOWN',
@@ -3548,5 +3855,46 @@ Thank you again for your participation!
             }
         }
     });
+
+    // NEW: Periodic status ping for monitoring (logs to Railway every 30 seconds)
+    // Helps researcher see interrogator/witness balance and catch issues early
+    let statusPingInterval = null;
+
+    async function doStatusPing() {
+        try {
+            const response = await fetch('/study_status_ping');
+            const result = await response.json();
+
+            if (result.status === 'ok') {
+                // Log summary to Railway for visual monitoring
+                logToRailway({
+                    type: 'STATUS_PING',
+                    message: `📊 I: ${result.interrogators.total} (${result.interrogators.waiting}W/${result.interrogators.in_conversation}C) | W: ${result.witnesses.total} (${result.witnesses.waiting}W/${result.witnesses.in_conversation}C) | Δ: ${result.waiting_mismatch}`,
+                    context: {
+                        study_mode: result.study_mode,
+                        interrogators: result.interrogators,
+                        witnesses: result.witnesses,
+                        waiting_mismatch: result.waiting_mismatch,
+                        total_mismatch: result.total_mismatch,
+                        role_counter: result.role_counter
+                    }
+                });
+            }
+        } catch (error) {
+            // Silently fail - this is just monitoring, shouldn't disrupt user
+        }
+    }
+
+    // Start status ping interval (every 30 seconds)
+    // Only run if we have a session (after role assignment)
+    setTimeout(() => {
+        if (participantId) {
+            // Initial ping
+            doStatusPing();
+
+            // Then every 30 seconds
+            statusPingInterval = setInterval(doStatusPing, 30000);
+        }
+    }, 5000); // Wait 5 seconds after page load to start
 
 });
