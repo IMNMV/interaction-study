@@ -1406,6 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentRole === 'interrogator') {
                         // Show rating UI for interrogator
                         assessmentAreaDiv.style.display = 'block';
+                        interrogatorRatingUI.style.display = 'block'; // Ensure rating UI is visible
                         chatInputContainer.style.display = 'none';
                         assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
 
@@ -2142,7 +2143,12 @@ Thank you again for your participation!
         // NEW: Show binary choice UI for witness (same as interrogator but no confidence slider)
         // Witness needs to make final judgment: was partner human or AI?
         showMainPhase('chat_and_assessment_flow');
-        chatInterfaceDiv.style.display = 'none';  // Hide chat
+        // FIX for Issue 2: Ensure chatInterfaceDiv is visible so assessmentAreaDiv (its child) can be seen
+        chatInterfaceDiv.style.display = 'block';  
+        // Hide the chat components specifically instead of the wrapper
+        chatInputContainer.style.display = 'none';
+        messageList.style.display = 'none';
+        
         assessmentAreaDiv.style.display = 'block';  // Show assessment
 
         // CRITICAL FIX: Show the interrogator rating UI (was hidden at conversation start for witnesses)
