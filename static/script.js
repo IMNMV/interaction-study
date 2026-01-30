@@ -2228,10 +2228,10 @@ Thank you again for your participation!
         choiceHumanButton.disabled = false;
         choiceAiButton.disabled = false;
 
-        // Update prompt for witness
+        // Update prompt for witness - more detailed since this is their only judgment
         const binaryPrompt = document.getElementById('binary-choice-prompt');
         if (binaryPrompt) {
-            binaryPrompt.textContent = 'Based on your conversation, do you think your partner was:';
+            binaryPrompt.textContent = 'Now that you have finished chatting with your partner, please tell us whether you believe your partner was a Human or an AI by selecting one of the buttons below:';
         }
 
         // Update assessment title
