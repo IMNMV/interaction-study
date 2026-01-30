@@ -2516,52 +2516,35 @@ Thank you again for your participation!
             await enterWaitingRoom();
 
             // Show 3-page post-demo instructions
+            // FIX: Do NOT call /join_waiting_room here - that marks user as "waiting" prematurely
+            // Role was already assigned via /get_or_assign_role at page load (stored in assignedRole)
+            // /join_waiting_room will be called when user clicks "Enter Waiting Room" button
             if (isHumanPartner) {
-                try {
-                    const roleResponse = await fetch('/join_waiting_room', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: sessionId })
-                    });
-                    const roleResult = await roleResponse.json();
+                // Use pre-assigned role (from /get_or_assign_role at page load)
+                currentRole = assignedRole;
 
-                    if (!roleResponse.ok) {
-                        throw new Error(roleResult.detail || 'Failed to assign role');
-                    }
-
-                    currentRole = roleResult.role;
-
-                    if (currentRole === 'witness' && roleResult.social_style) {
-                        witnessStyleNameSpan.textContent = roleResult.social_style;
-                        if (witnessStyleName2Span) witnessStyleName2Span.textContent = roleResult.social_style;
-                        witnessStyleDescriptionP.textContent = roleResult.social_style_description;
-
-                        logToRailway({
-                            type: 'WITNESS_SOCIAL_STYLE_ASSIGNED',
-                            message: 'Witness assigned social style',
-                            context: {
-                                style: roleResult.social_style,
-                                description: roleResult.social_style_description
-                            }
-                        });
-                    }
+                if (currentRole === 'witness' && assignedSocialStyle) {
+                    witnessStyleNameSpan.textContent = assignedSocialStyle;
+                    if (witnessStyleName2Span) witnessStyleName2Span.textContent = assignedSocialStyle;
+                    witnessStyleDescriptionP.textContent = assignedSocialStyleDescription || '';
 
                     logToRailway({
-                        type: 'ROLE_ASSIGNED_SHOWING_POST_DEMO_INSTRUCTIONS',
-                        message: 'Role assigned - showing 3-page post-demo instructions',
-                        context: { role: currentRole }
+                        type: 'WITNESS_SOCIAL_STYLE_ASSIGNED',
+                        message: 'Witness assigned social style',
+                        context: {
+                            style: assignedSocialStyle,
+                            description: assignedSocialStyleDescription
+                        }
                     });
-
-                    showRoleAssignment(currentRole);
-
-                } catch (error) {
-                    logToRailway({
-                        type: 'ROLE_ASSIGNMENT_ERROR',
-                        message: `Failed to assign role: ${error.message}`,
-                        context: { error: error }
-                    });
-                    showError('Failed to start matching. Please refresh and try again.');
                 }
+
+                logToRailway({
+                    type: 'ROLE_ASSIGNED_SHOWING_POST_DEMO_INSTRUCTIONS',
+                    message: 'Role assigned - showing 3-page post-demo instructions (NOT yet in waiting room)',
+                    context: { role: currentRole }
+                });
+
+                showRoleAssignment(currentRole);
             } else {
                 currentRole = 'interrogator';
 
@@ -2646,7 +2629,35 @@ Thank you again for your participation!
         showMainPhase('waiting-room');
 
         if (isHumanPartner) {
-            // HUMAN MODE: Role already assigned, go to waiting room + start polling
+            // HUMAN MODE: NOW actually join the waiting room (marks session as "waiting" in DB)
+            // FIX: This was previously called right after demographics, which was wrong
+            try {
+                const joinResponse = await fetch('/join_waiting_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const joinResult = await joinResponse.json();
+
+                if (!joinResponse.ok) {
+                    throw new Error(joinResult.detail || 'Failed to join waiting room');
+                }
+
+                logToRailway({
+                    type: 'JOIN_WAITING_ROOM_SUCCESS',
+                    message: 'Successfully joined waiting room (marked as waiting in DB)',
+                    context: { role: currentRole, match_status: joinResult.match_status }
+                });
+            } catch (error) {
+                logToRailway({
+                    type: 'JOIN_WAITING_ROOM_ERROR',
+                    message: `Failed to join waiting room: ${error.message}`,
+                    context: { error: error.message }
+                });
+                showError('Failed to enter waiting room. Please refresh and try again.');
+                return;
+            }
+
             isUserReady = true;
 
             logToRailway({
