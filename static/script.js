@@ -647,18 +647,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentRole === 'witness') {
                 // Witnesses don't see rating UI, only chat
                 interrogatorRatingUI.style.display = 'none';
-                witnessWaitingUI.style.display = 'none';
-                chatInputContainer.style.display = 'flex';
 
                 // Check if witness sends first message
                 if (firstMessageSender === 'witness') {
+                    witnessWaitingUI.style.display = 'none';
+                    chatInputContainer.style.display = 'flex';
                     userMessageInput.disabled = false;
                     sendMessageButton.disabled = false;
                     userMessageInput.focus();
                 } else {
                     // Waiting for interrogator's first message
-                    userMessageInput.disabled = true;
-                    sendMessageButton.disabled = true;
+                    // Hide text box completely (consistent with later rounds), show waiting UI
+                    chatInputContainer.style.display = 'none';
+                    witnessWaitingUI.style.display = 'block';
                     waitingForPartner = true;
                     startPartnerResponsePolling();
                 }
@@ -1425,6 +1426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         choiceAiButton.disabled = false;
                     } else {
                         // Witness - enable message input
+                        witnessWaitingUI.style.display = 'none';  // Hide waiting spinner
                         chatInputContainer.style.display = 'flex';
                         userMessageInput.disabled = false;
                         sendMessageButton.disabled = false;
@@ -2143,20 +2145,24 @@ Thank you again for your participation!
         chatInterfaceDiv.style.display = 'none';  // Hide chat
         assessmentAreaDiv.style.display = 'block';  // Show assessment
 
+        // CRITICAL FIX: Show the interrogator rating UI (was hidden at conversation start for witnesses)
+        // Without this, the assessment area is visible but empty (white page bug)
+        interrogatorRatingUI.style.display = 'block';
+
         // Reset binary choice state
         binaryChoice = null;
         binaryChoiceStartTime = Date.now();
         binaryChoiceInProgress = false; // Reset double-click protection
 
         // Show binary choice buttons and enable them
-        const binaryChoiceArea = document.getElementById('binary-choice-area');
-        const confidenceArea = document.getElementById('confidence-slider-area');
+        const binaryChoiceSection = document.getElementById('binary-choice-section');
+        const confidenceSection = document.getElementById('confidence-section');
 
-        if (binaryChoiceArea) {
-            binaryChoiceArea.style.display = 'block';
+        if (binaryChoiceSection) {
+            binaryChoiceSection.style.display = 'block';
         }
-        if (confidenceArea) {
-            confidenceArea.style.display = 'none';
+        if (confidenceSection) {
+            confidenceSection.style.display = 'none';
         }
 
         // Ensure binary choice buttons are enabled
@@ -2198,7 +2204,7 @@ Thank you again for your participation!
             context: {
                 role: currentRole,
                 turn: currentTurn,
-                binaryChoiceAreaVisible: binaryChoiceArea ? binaryChoiceArea.style.display : 'unknown',
+                binaryChoiceSectionVisible: binaryChoiceSection ? binaryChoiceSection.style.display : 'unknown',
                 assessmentAreaVisible: assessmentAreaDiv.style.display
             }
         });
