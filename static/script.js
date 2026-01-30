@@ -2215,15 +2215,8 @@ Thank you again for your participation!
         binaryChoiceInProgress = false; // Reset double-click protection
 
         // Show binary choice buttons and enable them
-        const binaryChoiceSection = document.getElementById('binary-choice-section');
-        const confidenceSection = document.getElementById('confidence-section');
-
-        if (binaryChoiceSection) {
-            binaryChoiceSection.style.display = 'block';
-        }
-        if (confidenceSection) {
-            confidenceSection.style.display = 'none';
-        }
+        binaryChoiceSection.style.display = 'block';
+        confidenceSection.style.display = 'none';
 
         // Ensure binary choice buttons are enabled
         choiceHumanButton.disabled = false;
@@ -2833,7 +2826,7 @@ Thank you again for your participation!
 
         // Reset confidence slider to 50% for new choice
         confidenceSlider.value = 50;
-        confidenceValueSpan.textContent = '50';
+        confidenceValueSpan.textContent = '--'; // Hide value until interaction to avoid bias
 
         // NEW: Hide slider thumb initially to avoid bias from previous round
         confidenceSlider.classList.add('pristine');
@@ -2849,6 +2842,8 @@ Thank you again for your participation!
     confidenceSlider.addEventListener('mousedown', () => {
         // Remove pristine class to show thumb on first interaction
         confidenceSlider.classList.remove('pristine');
+        // Show the actual value now that user has interacted
+        confidenceValueSpan.textContent = confidenceSlider.value;
 
         const baseMs = tsToMs(aiResponseTimestamp);
         // Always log on first touch (when confidenceStartTime is null)
@@ -2866,6 +2861,8 @@ Thank you again for your participation!
     confidenceSlider.addEventListener('touchstart', () => {
         // Remove pristine class to show thumb on first interaction
         confidenceSlider.classList.remove('pristine');
+        // Show the actual value now that user has interacted
+        confidenceValueSpan.textContent = confidenceSlider.value;
 
         const baseMs = tsToMs(aiResponseTimestamp);
         // Always log on first touch (when confidenceStartTime is null)
