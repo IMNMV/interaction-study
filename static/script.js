@@ -1078,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (waitTimeMs > 0) {
             const secondsRemaining = Math.ceil(waitTimeMs / 1000);
-            waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${secondsRemaining}s)...</span>`;
+            waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please wait...</span>`;
 
             logToRailway({
                 type: 'WAITING_FOR_SYNCHRONIZED_PROCEED',
@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const countdownInterval = setInterval(() => {
                 const remaining = Math.ceil((proceedAtMs - Date.now()) / 1000);
                 if (remaining > 0) {
-                    waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please finish reading instructions (${remaining}s)...</span>`;
+                    waitingStatusP.innerHTML = `<span style="color: #28a745; font-weight: bold;">Match found! Please wait...</span>`;
                 } else {
                     clearInterval(countdownInterval);
                 }
@@ -1370,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     context: { elapsed_ms: elapsedMs }
                 });
 
-                handlePartnerDropout();
+                handlePartnerDropout('timeout');
                 return;
             }
 
@@ -1488,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.partner_dropped) {
                     clearInterval(partnerPollInterval);
                     partnerPollInterval = null;
-                    handlePartnerDropout();
+                    handlePartnerDropout('left');
                 }
 
             } catch (error) {
@@ -1524,7 +1524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         context: { role: currentRole }
                     });
 
-                    handlePartnerDropout();
+                    handlePartnerDropout('left');
                     return;
                 }
 
@@ -1600,8 +1600,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handlePartnerDropout() {
-        logUiEvent('partner_dropped');
+    async function handlePartnerDropout(reason = 'timeout') {
+        // reason: 'left' = partner closed browser, 'timeout' = 2-min inactivity
+        logUiEvent('partner_dropped', { reason });
 
         // Stop partner polling
         if (partnerPollInterval) {
@@ -1755,9 +1756,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 context: { role: currentRole }
             });
 
-            // Show modal explaining what happened
+            // Show modal explaining what happened - different message based on reason
             witnessEndTitle.textContent = 'Study Ended';
-            witnessEndMessage.textContent = 'Your conversation partner was inactive for too long. The study has ended. Thank you for your participation!';
+            if (reason === 'left') {
+                witnessEndMessage.textContent = 'Your conversation partner has disconnected. The study has ended. Thank you for your participation!';
+            } else {
+                witnessEndMessage.textContent = 'Your conversation partner was inactive for too long. The study has ended. Thank you for your participation!';
+            }
             witnessEndModal.style.display = 'flex';
 
         } else {
