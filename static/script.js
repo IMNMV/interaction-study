@@ -500,7 +500,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeExpiredMessage = "Time's up! Finish your rating.";
             }
         } else if (typingIndicator.style.display === 'flex') {
-            // State 2: Waiting for AI response
+            // State 2: Waiting for AI response (typing indicator visible)
+            timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
+        } else if (chatInputContainer.style.display === 'none') {
+            // State 2b: Message sent, waiting for response (typing indicator not yet visible)
             timeExpiredMessage = 'Time limit reached! Waiting for response, then make final decision.';
         } else {
             // State 1: Before sending message
@@ -627,6 +630,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (assessmentTitle) {
                             assessmentTitle.textContent = "Time expired! Please make your final assessment:";
                         }
+
+                        // Update timer message now that assessment UI is visible
+                        updateTimerMessage();
                     }
                 }
             }
