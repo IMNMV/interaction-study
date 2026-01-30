@@ -579,17 +579,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     witnessEndMessage.textContent = 'The conversation time limit has been reached. Thank you for your participation!';
                     witnessEndModal.style.display = 'flex';
                 } else {
-                    // Interrogator flow - existing logic
-                    // Set initial timer message and show message if in rating phase
+                    // Interrogator flow
                     updateTimerMessage();
+
                     if (assessmentAreaDiv.style.display === 'block') {
-                        // NEW: Dynamic message based on rating phase
+                        // Already in assessment phase - just show message
                         if (binaryChoice === null) {
-                            // On binary choice screen - need both choice and rating
                             showError('Time expired! Please complete your Human/AI choice and confidence assessment to continue.');
                         } else {
-                            // On confidence slider - just need rating
                             showError('Time expired! Please complete your confidence assessment to continue.');
+                        }
+                    } else if (isHumanPartner && waitingForPartner) {
+                        // Human mode: waiting for partner response when timer expired
+                        // Stop polling and show final assessment UI
+                        logToRailway({
+                            type: 'INTERROGATOR_TIMER_EXPIRED_WAITING',
+                            message: 'Timer expired while waiting for partner - showing final assessment',
+                            context: { role: currentRole }
+                        });
+
+                        if (partnerPollInterval) {
+                            clearInterval(partnerPollInterval);
+                            partnerPollInterval = null;
+                        }
+                        stopBackgroundDropoutCheck();
+
+                        // Hide chat input
+                        chatInputContainer.style.display = 'none';
+
+                        // Show final assessment UI
+                        assessmentAreaDiv.style.display = 'block';
+                        interrogatorRatingUI.style.display = 'block';
+
+                        // Reset binary choice state
+                        binaryChoice = null;
+                        binaryChoiceStartTime = Date.now();
+                        binaryChoiceInProgress = false;
+
+                        // Show binary choice, hide confidence
+                        binaryChoiceSection.style.display = 'block';
+                        confidenceSection.style.display = 'none';
+                        choiceHumanButton.disabled = false;
+                        choiceAiButton.disabled = false;
+
+                        // Update title
+                        const assessmentTitle = assessmentAreaDiv.querySelector('h4');
+                        if (assessmentTitle) {
+                            assessmentTitle.textContent = "Time expired! Please make your final assessment:";
                         }
                     }
                 }
@@ -1406,7 +1442,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentRole === 'interrogator') {
                         // Show rating UI for interrogator
                         assessmentAreaDiv.style.display = 'block';
-                        interrogatorRatingUI.style.display = 'block'; // Ensure rating UI is visible
                         chatInputContainer.style.display = 'none';
                         assessmentAreaDiv.querySelector('h4').textContent = "Your Assessment";
 
@@ -1764,25 +1799,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 4000);
 
             } else {
-                // No unrated message - route directly to feedback
+                // No unrated message - but they still need to make a FINAL assessment
+                // Show the assessment UI for their final judgment
                 logToRailway({
                     type: 'INTERROGATOR_PARTNER_DROPPED_NO_UNRATED',
-                    message: 'Partner dropped - no unrated message, routing directly to feedback',
+                    message: 'Partner dropped - showing final assessment UI',
                     context: { role: currentRole }
                 });
 
                 // Show brief notification modal
                 interrogatorConnectionModal.style.display = 'flex';
 
-                // Auto-close after 3 seconds and route to feedback
+                // Auto-close after 3 seconds and show final assessment
                 setTimeout(() => {
                     interrogatorConnectionModal.style.display = 'none';
-                    showMainPhase('feedback');
-                    feedbackTextarea.focus();
+
+                    // Show the assessment UI for final judgment
+                    assessmentAreaDiv.style.display = 'block';
+                    interrogatorRatingUI.style.display = 'block';
+
+                    // Reset binary choice state for final assessment
+                    binaryChoice = null;
+                    binaryChoiceStartTime = Date.now();
+                    binaryChoiceInProgress = false;
+
+                    // Show binary choice, hide confidence
+                    binaryChoiceSection.style.display = 'block';
+                    confidenceSection.style.display = 'none';
+                    choiceHumanButton.disabled = false;
+                    choiceAiButton.disabled = false;
+
+                    // Update title to indicate final assessment
+                    const assessmentTitle = assessmentAreaDiv.querySelector('h4');
+                    if (assessmentTitle) {
+                        assessmentTitle.textContent = "Your partner has disconnected. Please make your final assessment:";
+                    }
 
                     logToRailway({
-                        type: 'INTERROGATOR_ROUTED_TO_FEEDBACK',
-                        message: 'Auto-closed notification, routed to feedback form',
+                        type: 'INTERROGATOR_SHOWN_FINAL_ASSESSMENT',
+                        message: 'Auto-closed notification, showing final assessment UI',
                         context: { role: currentRole }
                     });
                 }, 3000);
@@ -2143,16 +2198,15 @@ Thank you again for your participation!
         // NEW: Show binary choice UI for witness (same as interrogator but no confidence slider)
         // Witness needs to make final judgment: was partner human or AI?
         showMainPhase('chat_and_assessment_flow');
-        // FIX for Issue 2: Ensure chatInterfaceDiv is visible so assessmentAreaDiv (its child) can be seen
-        chatInterfaceDiv.style.display = 'block';  
-        // Hide the chat components specifically instead of the wrapper
-        chatInputContainer.style.display = 'none';
-        messageList.style.display = 'none';
-        
-        assessmentAreaDiv.style.display = 'block';  // Show assessment
 
-        // CRITICAL FIX: Show the interrogator rating UI (was hidden at conversation start for witnesses)
-        // Without this, the assessment area is visible but empty (white page bug)
+        // CRITICAL FIX: Don't hide chatInterfaceDiv - assessmentAreaDiv is INSIDE it!
+        // Instead, hide just the chat-specific elements and show the assessment
+        const chatWindow = document.querySelector('.chat-window');
+        if (chatWindow) chatWindow.style.display = 'none';
+        chatInputContainer.style.display = 'none';
+
+        // Show assessment area and its content
+        assessmentAreaDiv.style.display = 'block';
         interrogatorRatingUI.style.display = 'block';
 
         // Reset binary choice state
