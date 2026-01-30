@@ -1018,48 +1018,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showRoleInstructionsInWaitingRoom(role, socialStyle = null, socialStyleDescription = null) {
-        // Show role-specific instructions INSIDE the waiting room
-        const instructionsDiv = document.getElementById('waiting-room-instructions');
-        const roleTitleSpan = document.getElementById('waiting-room-role-title');
-        const instructionsContent = document.getElementById('waiting-room-instructions-content');
-
-        roleTitleSpan.textContent = role.toUpperCase();
-
-        if (role === 'interrogator') {
-            instructionsContent.innerHTML = `
-                <p><strong>Your task:</strong> Have a conversation with your partner and decide if they are human or AI.</p>
-                <ul style="text-align: left; margin: 15px 0;">
-                    <li>You will start the conversation</li>
-                    <li>Ask questions to determine if your partner is human or AI</li>
-                    <li>After each message from your partner, you'll rate how human-like they seem</li>
-                    <li>The conversation will last for 15 message exchanges</li>
-                </ul>
-                <p style="margin-top: 15px;"><strong>Please read these instructions carefully while you wait.</strong></p>
-            `;
-        } else {
-            // Witness instructions - include social style if provided
-            let styleSection = '';
-            if (socialStyle && socialStyleDescription) {
-                styleSection = `
-                    <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
-                        <p style="margin: 0;">The conversation style we'd like you to use is <strong>${socialStyle}</strong>.</p>
-                        <p style="margin: 10px 0 0 0;">Some ways for you to use this style: ${socialStyleDescription}</p>
-                    </div>
-                `;
-            }
-
-            instructionsContent.innerHTML = `
-                ${styleSection}
-            `;
-        }
-
-        instructionsDiv.style.display = 'block';
-
-        logToRailway({
-            type: 'INSTRUCTIONS_SHOWN_IN_WAITING_ROOM',
-            message: 'Role instructions displayed in waiting room',
-            context: { role, socialStyle }
-        });
+        // REMOVED: No longer showing instructions in waiting room
+        // User already read 3 pages of instructions before clicking "Enter Waiting Room"
+        return;
     }
 
     function waitUntilProceedTime(proceedAtTimestamp) {
