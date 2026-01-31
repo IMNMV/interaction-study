@@ -1253,12 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Show timeout warning after 1.5 minutes (90 seconds)
-                if (elapsed >= 90 && elapsed < 120) {
-                    waitingTimeoutWarningDiv.style.display = 'block';
-                }
-
-                // Hard timeout after 2 minutes (120 seconds)
+                // Auto-timeout after 2 minutes (120 seconds) - no warning, just redirect
                 if (elapsed >= 120) {
                     clearInterval(matchCheckInterval);
                     clearInterval(waitingTimerInterval); // Stop timer updates
