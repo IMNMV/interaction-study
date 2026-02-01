@@ -567,11 +567,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         context: { role: currentRole }
                     });
 
-                    // Stop partner polling
+                    // Stop partner polling and intermittent bubbles
                     if (partnerPollInterval) {
                         clearInterval(partnerPollInterval);
                         partnerPollInterval = null;
                     }
+                    stopIntermittentBubbles();
 
                     // Hide chat UI
                     chatInputContainer.style.display = 'none';
@@ -584,6 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // Interrogator flow
                     updateTimerMessage();
+                    stopIntermittentBubbles(); // Stop any lingering typing bubbles
 
                     if (assessmentAreaDiv.style.display === 'block') {
                         // Already in assessment phase - just show message
@@ -606,6 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             partnerPollInterval = null;
                         }
                         stopBackgroundDropoutCheck();
+                        stopIntermittentBubbles();
 
                         // Hide chat input
                         chatInputContainer.style.display = 'none';
