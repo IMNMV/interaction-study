@@ -732,13 +732,32 @@
         <div id="error-message-area" class="error-message" style="display:none;"></div>
    </div>
 
-   <div id="demographics-modal" class="modal-overlay" style="display: none;">
+
+    <div id="final-instructions-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <p>Before we begin you will fill out a demographics questionnaire to better understand your experiences with AI, as well as basic information about you.</p>
-            <button id="modal-continue-button">I Understand, Continue</button>
+            <p>In a moment you will see a conversation box. Your job is to decide if your conversational partner is a human, or an AI.</p>
+            <p><em>Remember, if your partner is an AI it has been instructed to be as human as possible. Likewise, if your partner is human they have also been instructed to act as human as possible. Consider what kinds of messages may clue you in to if your conversational partner is an AI or a human.
+                You should consider each message sent by your conversation partner as evidence towards your judgment for that turn. You are free to chat as you would like.</em></p>
+
+            <p><strong>After each message from your partner, you'll answer two questions:</strong></p>
+            <ol>
+                <li><strong>What's your best guess right now?</strong> Click either "Human" or "AI"
+                    <ul>
+                        <li><em>Be ready before clicking - once you select, it immediately moves to the next question.</em></li>
+                    </ul>
+                </li>
+                <li><strong>How confident are you?</strong> Use the slider (0-100%)
+                    <ul>
+                        <li>0% = completely guessing, 50% = somewhat confident, 100% = completely certain</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <p>You will chat with your partner for 7 minutes and 30 seconds. At the 7 minute 30 second mark you will make a final determination.</p>
+            <p>Response delays due to the strength of connection between you and your partner may occur when messages are sent and received, but the total chat time will be 7 minutes and 30 seconds.</p>
+            <button id="final-instructions-button">I understand</button>
         </div>
     </div>
-
 
     <!-- NEW: Witness end-of-study modal -->
     <div id="witness-end-modal" class="modal-overlay" style="display: none;">
