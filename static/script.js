@@ -9,9 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessageArea = document.getElementById('error-message-area');
     const instructionsPhaseDiv = document.getElementById('instructions-phase');
     const confirmInstructionsButton = document.getElementById('confirm-instructions-button');
-    const demographicsModal = document.getElementById('demographics-modal');
-    const modalContinueButton = document.getElementById('modal-continue-button');
-
+    const finalInstructionsModal = document.getElementById('final-instructions-modal');
+    const finalInstructionsButton = document.getElementById('final-instructions-button');
 
     // State flags for the new parallel logic
     let isBackendReady = false;
@@ -659,6 +658,8 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(progressInterval);
             initLoadingDiv.style.display = 'none';
 
+            // Ensure the instruction pop-up is hidden
+            finalInstructionsModal.style.display = 'none';
 
             // Switch to the main chat page view
             showMainPhase('chat_and_assessment_flow');
@@ -2351,14 +2352,8 @@ Thank you again for your participation!
 
     confirmInstructionsButton.addEventListener('click', () => {
         logUiEvent('instructions_understand_clicked', { finalPage: currentInstructionPage });
-        // Show the modal pop-up instead of the next page
-        demographicsModal.style.display = 'flex';
-    });
-
-    modalContinueButton.addEventListener('click', () => {
-        logUiEvent('demographics_modal_continue_clicked');
-        demographicsModal.style.display = 'none'; // Hide the modal
-        showMainPhase('initial'); // Now, show the demographics page
+        // Go directly to demographics page
+        showMainPhase('initial');
     });
 
     // Post-demographics instruction pagination navigation
