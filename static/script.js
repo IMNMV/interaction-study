@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessageArea = document.getElementById('error-message-area');
     const instructionsPhaseDiv = document.getElementById('instructions-phase');
     const confirmInstructionsButton = document.getElementById('confirm-instructions-button');
+    const demographicsModal = document.getElementById('demographics-modal');
+    const modalContinueButton = document.getElementById('modal-continue-button');
+
     const finalInstructionsModal = document.getElementById('final-instructions-modal');
     const finalInstructionsButton = document.getElementById('final-instructions-button');
 
@@ -2352,8 +2355,14 @@ Thank you again for your participation!
 
     confirmInstructionsButton.addEventListener('click', () => {
         logUiEvent('instructions_understand_clicked', { finalPage: currentInstructionPage });
-        // Go directly to demographics page
+        // Skip the demographics modal, go directly to demographics page
         showMainPhase('initial');
+    });
+
+    modalContinueButton.addEventListener('click', () => {
+        logUiEvent('demographics_modal_continue_clicked');
+        demographicsModal.style.display = 'none'; // Hide the modal
+        showMainPhase('initial'); // Now, show the demographics page
     });
 
     // Post-demographics instruction pagination navigation
