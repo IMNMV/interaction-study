@@ -12,8 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const demographicsModal = document.getElementById('demographics-modal');
     const modalContinueButton = document.getElementById('modal-continue-button');
 
-    const finalInstructionsModal = document.getElementById('final-instructions-modal');
-    const finalInstructionsButton = document.getElementById('final-instructions-button');
 
     // State flags for the new parallel logic
     let isBackendReady = false;
@@ -661,8 +659,6 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(progressInterval);
             initLoadingDiv.style.display = 'none';
 
-            // Ensure the instruction pop-up is hidden
-            finalInstructionsModal.style.display = 'none';
 
             // Switch to the main chat page view
             showMainPhase('chat_and_assessment_flow');
@@ -1326,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setTimeout(() => {
                 tryProceedToChat();
-            }, 1500);
+            }, 3000);
         }, simulatedWaitTime);
     }
 
