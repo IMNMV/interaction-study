@@ -1047,13 +1047,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (currentPostDemoPage === totalPostDemoPages) {
-            // Last page - hide Next, show centered Enter Waiting Room button
+            // Last page - hide Next, show attention check (not Enter Waiting Room yet)
             if (postDemoNextBtn) postDemoNextBtn.style.display = 'none';
-            enterWaitingRoomButton.style.display = 'block';
+            showAttentionCheck();
         } else {
-            // Not last page - show Next, hide Enter Waiting Room
+            // Not last page - show Next, hide Enter Waiting Room and attention check
             if (postDemoNextBtn) postDemoNextBtn.style.display = 'inline-block';
             enterWaitingRoomButton.style.display = 'none';
+            const attentionCheckSection = document.getElementById('attention-check-section');
+            if (attentionCheckSection) attentionCheckSection.style.display = 'none';
         }
 
         logToRailway({
@@ -1062,6 +1064,148 @@ document.addEventListener('DOMContentLoaded', () => {
             context: { page: currentPostDemoPage }
         });
     }
+
+    // --- ATTENTION CHECK LOGIC ---
+    let attentionCheckAttempts = 0;
+    let attentionCheckCorrectIndex = -1;
+
+    const FAKE_STYLES = [
+        { name: 'ANALYTICAL', traits: 'methodical, logical, focused on facts and data' },
+        { name: 'RESERVED', traits: 'quiet, observant, speaks only when necessary' },
+        { name: 'ENTHUSIASTIC', traits: 'excited, energetic, uses lots of exclamation points' }
+    ];
+
+    // Extract traits from full description (removes "Use this strategy..." prefix)
+    function extractTraits(fullDescription) {
+        if (!fullDescription) return '';
+        // Match text after "you're " or "is to " or "is that you're "
+        const match = fullDescription.match(/(?:you're |is to |is that you're )(.+)/i);
+        return match ? match[1] : fullDescription;
+    }
+
+    const INTERROGATOR_OPTIONS = [
+        { text: 'Select Human or AI, then adjust a confidence slider', correct: true },
+        { text: 'Type a response as quickly as possible', correct: false },
+        { text: 'Rate the message on a 5-star scale', correct: false },
+        { text: 'Wait for the next message automatically', correct: false }
+    ];
+
+    function shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    function showAttentionCheck() {
+        const attentionCheckSection = document.getElementById('attention-check-section');
+        const questionEl = document.getElementById('attention-check-question');
+        const errorEl = document.getElementById('attention-check-error');
+
+        // Reset state
+        attentionCheckAttempts = 0;
+        errorEl.style.display = 'none';
+        document.querySelectorAll('input[name="attention-check"]').forEach(r => r.checked = false);
+
+        let options = [];
+
+        if (currentRole === 'witness') {
+            // Witness: select their assigned style from 1 real + 3 fake
+            questionEl.textContent = 'What conversation style were you assigned?';
+
+            const realTraits = extractTraits(assignedSocialStyleDescription);
+            const realOption = {
+                text: `${assignedSocialStyle} - ${realTraits}`,
+                correct: true
+            };
+
+            const fakeOptions = FAKE_STYLES.map(fake => ({
+                text: `${fake.name} - ${fake.traits}`,
+                correct: false
+            }));
+
+            options = shuffleArray([realOption, ...fakeOptions]);
+        } else {
+            // Interrogator: select what they do after each message
+            questionEl.textContent = 'What is your task after each message from your partner?';
+            options = shuffleArray([...INTERROGATOR_OPTIONS]);
+        }
+
+        // Find correct index and populate options
+        options.forEach((opt, index) => {
+            const spanEl = document.getElementById(`attention-option-${index}`);
+            spanEl.textContent = opt.text;
+            if (opt.correct) {
+                attentionCheckCorrectIndex = index;
+            }
+        });
+
+        attentionCheckSection.style.display = 'block';
+        enterWaitingRoomButton.style.display = 'none';
+
+        logToRailway({
+            type: 'ATTENTION_CHECK_SHOWN',
+            message: 'Attention check displayed',
+            context: { role: currentRole, correctIndex: attentionCheckCorrectIndex }
+        });
+    }
+
+    // Attention check submit handler
+    const attentionCheckSubmit = document.getElementById('attention-check-submit');
+    if (attentionCheckSubmit) {
+        attentionCheckSubmit.addEventListener('click', () => {
+            const selected = document.querySelector('input[name="attention-check"]:checked');
+            const errorEl = document.getElementById('attention-check-error');
+
+            if (!selected) {
+                errorEl.textContent = 'Please select an answer.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            attentionCheckAttempts++;
+            const selectedIndex = parseInt(selected.value);
+            const isCorrect = selectedIndex === attentionCheckCorrectIndex;
+
+            logToRailway({
+                type: 'ATTENTION_CHECK_SUBMITTED',
+                message: `Attention check answer submitted`,
+                context: {
+                    role: currentRole,
+                    selectedIndex,
+                    correctIndex: attentionCheckCorrectIndex,
+                    isCorrect,
+                    attempt: attentionCheckAttempts
+                }
+            });
+
+            if (isCorrect) {
+                // Correct! Hide attention check, show Enter Waiting Room button
+                errorEl.style.display = 'none';
+                document.getElementById('attention-check-section').style.display = 'none';
+                enterWaitingRoomButton.style.display = 'block';
+
+                logToRailway({
+                    type: 'ATTENTION_CHECK_PASSED',
+                    message: 'Attention check passed',
+                    context: { role: currentRole, attempts: attentionCheckAttempts }
+                });
+            } else {
+                // Wrong - show error, let them retry
+                errorEl.textContent = "That's not quite right. Please read the instructions again and try again.";
+                errorEl.style.display = 'block';
+
+                logToRailway({
+                    type: 'ATTENTION_CHECK_FAILED_ATTEMPT',
+                    message: 'Attention check wrong answer',
+                    context: { role: currentRole, attempt: attentionCheckAttempts, selectedIndex }
+                });
+            }
+        });
+    }
+    // --- END ATTENTION CHECK LOGIC ---
 
     function showRoleInstructionsInWaitingRoom(role, socialStyle = null, socialStyleDescription = null) {
         // REMOVED: No longer showing instructions in waiting room
