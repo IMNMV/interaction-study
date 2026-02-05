@@ -563,6 +563,35 @@
                 </div>
             </div>
 
+            <!-- ATTENTION CHECK SECTION -->
+            <div id="attention-check-section" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                <h3 style="margin-top: 0;">Quick Check</h3>
+                <p id="attention-check-question" style="font-weight: bold; margin-bottom: 15px;"></p>
+
+                <div id="attention-check-options" style="display: flex; flex-direction: column; gap: 10px;">
+                    <label class="attention-option" style="display: flex; align-items: flex-start; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">
+                        <input type="radio" name="attention-check" value="0" style="margin-right: 10px; margin-top: 3px;">
+                        <span id="attention-option-0"></span>
+                    </label>
+                    <label class="attention-option" style="display: flex; align-items: flex-start; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">
+                        <input type="radio" name="attention-check" value="1" style="margin-right: 10px; margin-top: 3px;">
+                        <span id="attention-option-1"></span>
+                    </label>
+                    <label class="attention-option" style="display: flex; align-items: flex-start; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">
+                        <input type="radio" name="attention-check" value="2" style="margin-right: 10px; margin-top: 3px;">
+                        <span id="attention-option-2"></span>
+                    </label>
+                    <label class="attention-option" style="display: flex; align-items: flex-start; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">
+                        <input type="radio" name="attention-check" value="3" style="margin-right: 10px; margin-top: 3px;">
+                        <span id="attention-option-3"></span>
+                    </label>
+                </div>
+
+                <p id="attention-check-error" style="color: #dc3545; margin-top: 15px; display: none;">That's not quite right. Please read the instructions again and try again.</p>
+
+                <button type="button" id="attention-check-submit" style="margin-top: 15px; padding: 10px 20px; font-size: 16px; cursor: pointer;">Submit Answer</button>
+            </div>
+
             <button id="enter-waiting-room-button" class="cta-button" style="display: none; margin-top: 15px; margin-left: auto; margin-right: auto;">Enter Waiting Room</button>
         </div>
 
